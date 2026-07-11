@@ -1,24 +1,13 @@
 import { Router } from 'express';
-import {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser,
-} from '../controllers/user.controller';
-import { authenticate, authorize } from '../middlewares/auth';
+import { getUser, updateUser, updateAvatar, getTopSellers } from '../controllers/user.controller';
+import { authenticate } from '../middlewares/auth';
+import { uploadSingle } from '../middlewares/upload';
 
 const router = Router();
 
-// Public routes
-router.get('/', getUsers);
-router.get('/:id', getUserById);
-
-// Protected routes (cần đăng nhập)
-router.post('/', createUser);
-
-// Admin only routes
-router.patch('/:id', authenticate, authorize('admin'), updateUser);
-router.delete('/:id', authenticate, authorize('admin'), deleteUser);
+router.get('/top-sellers', getTopSellers);
+router.get('/:id', getUser);
+router.patch('/:id', authenticate, updateUser);
+router.put('/:id/avatar', authenticate, uploadSingle, updateAvatar);
 
 export default router;

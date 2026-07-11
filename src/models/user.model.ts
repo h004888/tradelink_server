@@ -1,25 +1,51 @@
-export interface IUser {
-  id: string;
-  name: string;
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface IUser extends Document {
   email: string;
-  password: string;
-  role: 'admin' | 'user';
+  name: string;
+  passwordHash?: string;
+  role: 'buyer' | 'seller' | 'admin';
+  avatarUrl?: string;
+  address?: string;
+  reputationScore: number;
+  totalTransactions: number;
+  successRate: number;
+  totalListings: number;
+  memberSince: Date;
   createdAt: Date;
   updatedAt: Date;
+  // A2/J5 — forgot/reset password
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
+  // A3 — email verification
+  isVerified?: boolean;
+  verifyToken?: string;
+  verifyTokenExpires?: Date;
+  // Auth — refresh token rotation version
+  tokenVersion: number;
 }
 
-export interface IUserResponse {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-  createdAt: Date;
-}
+const userSchema = new Schema<IUser>(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true },
+    passwordHash: { type: String },
+    role: { type: String, enum: ['buyer', 'seller', 'admin'], default: 'buyer' },
+    avatarUrl: { type: String },
+    address: { type: String },
+    reputationScore: { type: Number, default: 0 },
+    totalTransactions: { type: Number, default: 0 },
+    successRate: { type: Number, default: 100 },
+    totalListings: { type: Number, default: 0 },
+    memberSince: { type: Date, default: Date.now },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
+    isVerified: { type: Boolean, default: false },
+    verifyToken: { type: String, select: false },
+    verifyTokenExpires: { type: Date, select: false },
+    tokenVersion: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
 
-/**
- * Loại bỏ các field nhạy cảm trước khi trả về client.
- */
-export const sanitizeUser = (user: IUser): IUserResponse => {
-  const { password, ...safe } = user;
-  return safe;
-};
+export const User = mongoose.model<IUser>('User', userSchema);
