@@ -8,6 +8,8 @@ export interface IUser extends Document {
   avatarUrl?: string;
   phone?: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
   reputationScore: number;
   rating: number;
   totalTransactions: number;
@@ -43,6 +45,8 @@ const userSchema = new Schema<IUser>(
     avatarUrl: { type: String },
     phone: { type: String },
     address: { type: String },
+    latitude: { type: Number },
+    longitude: { type: Number },
     reputationScore: { type: Number, default: 0 },
     rating: { type: Number, default: 0, min: 0, max: 5 },
     totalTransactions: { type: Number, default: 0 },

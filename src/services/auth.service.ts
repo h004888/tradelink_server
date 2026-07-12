@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { User, IUser } from '../models/user.model';
+import { Listing } from '../models/listing.model';
+import { Transaction } from '../models/transaction.model';
 import { config } from '../config';
 import { AppError } from '../utils/AppError';
 import { generateTokens, verifyRefreshToken } from './token.service';
@@ -99,10 +101,29 @@ export const refreshAccessToken = async (refreshToken: string): Promise<{ token:
   return { ...tokens, user: updatedUser };
 };
 
-export const getMe = async (userId: string): Promise<IUser> => {
+export const getMe = async (userId: string): Promise<IUser & { totalListings: number; totalTransactions: number; successRate: number }> => {
   const user = await User.findById(userId);
   if (!user) throw new AppError('Không tìm thấy người dùng', 404);
-  return user;
+
+  // Đếm số liệu thực tế từ DB — không dùng field tĩnh trong User document
+  const [totalListings, totalTransactions, completedTransactions] = await Promise.all([
+    Listing.countDocuments({ sellerId: userId, status: { $ne: 'draft' } }),
+    Transaction.countDocuments({ $or: [{ buyerId: userId }, { sellerId: userId }] }),
+    Transaction.countDocuments({
+      $or: [{ buyerId: userId }, { sellerId: userId }],
+      escrowStep: 'released',
+    }),
+  ]);
+
+  const successRate = totalTransactions > 0
+    ? Math.round((completedTransactions / totalTransactions) * 100)
+    : 100;
+
+  const result: any = user.toObject();
+  result.totalListings = totalListings;
+  result.totalTransactions = totalTransactions;
+  result.successRate = successRate;
+  return result as IUser & { totalListings: number; totalTransactions: number; successRate: number };
 };
 
 /**
