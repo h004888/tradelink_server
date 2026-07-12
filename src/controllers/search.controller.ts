@@ -7,6 +7,7 @@ export const search = async (req: Request, res: Response, next: NextFunction) =>
       q: req.query.q as string,
       type: req.query.type as string,
       category: req.query.category as string,
+      categoryId: req.query.categoryId as string,
       minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
       maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
@@ -16,9 +17,52 @@ export const search = async (req: Request, res: Response, next: NextFunction) =>
   } catch (err) { next(err); }
 };
 
-export const home = async (_req: Request, res: Response, next: NextFunction) => {
+export const home = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await searchService.getHome();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    if (page < 1 || limit < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid page or limit parameter',
+      });
+    }
+
+    const data = await searchService.getHome(page, limit);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+export const feed = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    if (page < 1 || limit < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid page or limit parameter',
+      });
+    }
+
+    const filters = {
+      type: req.query.type as string,
+      minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
+      maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
+      condition: req.query.condition as string,
+      sort: req.query.sort as string,
+    };
+
+    const data = await searchService.getFeed(page, limit, filters);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+export const suggestions = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = req.query.q as string || '';
+    const data = await searchService.getSuggestions(query);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };

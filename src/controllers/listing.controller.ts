@@ -11,6 +11,7 @@ export const getListings = async (req: Request, res: Response, next: NextFunctio
       status: req.query.status as string,
       type: req.query.type as string,
       category: req.query.category as string,
+      categoryId: req.query.categoryId as string,
       minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
       maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
       lat: req.query.lat ? Number(req.query.lat) : undefined,

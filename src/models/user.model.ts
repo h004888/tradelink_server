@@ -6,9 +6,13 @@ export interface IUser extends Document {
   passwordHash?: string;
   role: 'buyer' | 'seller' | 'admin';
   avatarUrl?: string;
+  phone?: string;
   address?: string;
   reputationScore: number;
+  rating: number;
   totalTransactions: number;
+  totalReviews: number;
+  responseTime: string;
   successRate: number;
   totalListings: number;
   memberSince: Date;
@@ -21,6 +25,11 @@ export interface IUser extends Document {
   isVerified?: boolean;
   verifyToken?: string;
   verifyTokenExpires?: Date;
+  // OTP
+  otp?: string;
+  otpExpiry?: Date;
+  otpAttempts?: number;
+  otpLockedUntil?: Date;
   // Auth — refresh token rotation version
   tokenVersion: number;
 }
@@ -32,9 +41,13 @@ const userSchema = new Schema<IUser>(
     passwordHash: { type: String },
     role: { type: String, enum: ['buyer', 'seller', 'admin'], default: 'buyer' },
     avatarUrl: { type: String },
+    phone: { type: String },
     address: { type: String },
     reputationScore: { type: Number, default: 0 },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
     totalTransactions: { type: Number, default: 0 },
+    totalReviews: { type: Number, default: 0 },
+    responseTime: { type: String, default: 'Chưa có' },
     successRate: { type: Number, default: 100 },
     totalListings: { type: Number, default: 0 },
     memberSince: { type: Date, default: Date.now },
@@ -43,6 +56,10 @@ const userSchema = new Schema<IUser>(
     isVerified: { type: Boolean, default: false },
     verifyToken: { type: String, select: false },
     verifyTokenExpires: { type: Date, select: false },
+    otp: { type: String, select: false },
+    otpExpiry: { type: Date, select: false },
+    otpAttempts: { type: Number, default: 0, select: false },
+    otpLockedUntil: { type: Date, select: false },
     tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }

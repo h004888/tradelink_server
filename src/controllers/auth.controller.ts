@@ -4,8 +4,8 @@ import { AuthRequest } from '../middlewares/auth';
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name } = req.body;
-    const data = await authService.register(email, password, name);
+    const { email, password, name, phone, address } = req.body;
+    const data = await authService.register(email, password, name, phone, address);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -82,5 +82,27 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
     const { token } = req.body;
     await authService.verifyEmailWithToken(token);
     res.json({ success: true, message: 'Xác nhận email thành công' });
+  } catch (err) { next(err); }
+};
+
+/**
+ * POST /auth/verify-otp — body: { email, otp }
+ */
+export const verifyOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, otp } = req.body;
+    const data = await authService.verifyOTP(email, otp);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+/**
+ * POST /auth/resend-otp — body: { email }
+ */
+export const resendOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body;
+    await authService.resendOTP(email);
+    res.json({ success: true, message: 'Đã gửi lại mã OTP' });
   } catch (err) { next(err); }
 };

@@ -12,6 +12,7 @@ import disputeRoutes from './dispute.routes';
 import reviewRoutes from './review.routes';
 import adminRoutes from './admin.routes';
 import uploadRoutes from './upload.routes';
+import categoryRoutes from './category.routes';
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use('/disputes', disputeRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/admin', adminRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/categories', categoryRoutes);
 
 export default router;

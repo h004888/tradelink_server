@@ -8,6 +8,9 @@ export const registerSchema = z.object({
   email: emailStr('Email không được để trống'),
   password: passwordStr,
   name: z.string('Tên không được để trống').min(2, 'Tên phải từ 2 ký tự').max(100, 'Tên tối đa 100 ký tự'),
+  phone: z.string('Số điện thoại không được để trống')
+    .regex(/^(0[3|5|7|8|9])+([0-9]{8})$/, 'Số điện thoại không hợp lệ'),
+  address: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -35,4 +38,13 @@ export const resetPasswordSchema = z.object({
 
 export const verifyEmailSchema = z.object({
   token: tokenStr,
+});
+
+export const verifyOTPSchema = z.object({
+  email: emailStr('Email không được để trống'),
+  otp: z.string('Mã OTP không được để trống').regex(/^\d{6}$/, 'Mã OTP phải là 6 chữ số'),
+});
+
+export const resendOTPSchema = z.object({
+  email: emailStr('Email không được để trống'),
 });

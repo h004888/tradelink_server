@@ -1,10 +1,12 @@
 import { Listing, IListing } from '../models/listing.model';
+import { Category } from '../models/category.model';
 import { AppError } from '../utils/AppError';
 
 interface ListingFilter {
   status?: string;
   type?: string;
   category?: string;
+  categoryId?: string;
   sellerId?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -21,6 +23,7 @@ export const findAll = async (filter: ListingFilter) => {
   if (filter.status) query.status = filter.status;
   if (filter.type) query.type = { $in: [filter.type, 'both'] };
   if (filter.category) query.category = filter.category;
+  if (filter.categoryId) query.categoryId = filter.categoryId;
   if (filter.sellerId) query.sellerId = filter.sellerId;
   if (filter.minPrice !== undefined || filter.maxPrice !== undefined) {
     query.price = {};
@@ -80,10 +83,25 @@ export const findDrafts = async (userId: string) => {
   return Listing.find({ sellerId: userId, status: 'draft' }).sort({ createdAt: -1 });
 };
 
-export const findById = async (id: string): Promise<IListing> => {
+export const findById = async (id: string) => {
   const listing = await Listing.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true });
   if (!listing) throw new AppError('Không tìm thấy tin đăng', 404);
-  return listing;
+
+  // Populate category name
+  let categoryName = listing.category;
+  if (listing.categoryId) {
+    try {
+      const category = await Category.findById(listing.categoryId);
+      if (category) categoryName = category.name;
+    } catch (e) {
+      // Fallback: keep category slug
+    }
+  }
+
+  return {
+    ...listing.toObject(),
+    categoryName,
+  };
 };
 
 export const create = async (data: Partial<IListing>): Promise<IListing> => {

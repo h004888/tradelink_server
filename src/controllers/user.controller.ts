@@ -43,3 +43,21 @@ export const getTopSellers = async (_req: Request, res: Response, next: NextFunc
     res.json({ success: true, data: sellers });
   } catch (err) { next(err); }
 };
+
+export const getUserStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await userService.getUserStats(req.params.id as string);
+    res.json({ success: true, data: stats });
+  } catch (err) { next(err); }
+};
+
+/**
+ * GET /users/:id/profile — Public profile cho Seller Profile screen.
+ * Trả về thông tin người bán + danh sách tin đang active.
+ */
+export const getPublicProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await userService.getPublicProfile(req.params.id as string);
+    res.json({ success: true, data: profile });
+  } catch (err) { next(err); }
+};

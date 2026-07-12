@@ -4,44 +4,55 @@ import { User, IUser } from '../models/user.model';
 import { config } from '../config';
 import { AppError } from '../utils/AppError';
 import { generateTokens, verifyRefreshToken } from './token.service';
+import { sendOTP } from './email.service';
+
+// Generate OTP 6 digits
+const generateOTP = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 export const register = async (
   email: string,
   password: string,
-  name: string
-): Promise<{ token: string; refreshToken: string; user: IUser; verifyToken?: string }> => {
+  name: string,
+  phone: string,
+  address?: string
+): Promise<{ userId: string; email: string }> => {
   const existing = await User.findOne({ email });
   if (existing) throw new AppError('Email đã được đăng ký', 409);
 
   const passwordHash = await bcrypt.hash(password, config.bcrypt.rounds);
-  // A3 — tạo verify token (workaround vì K4 email service chưa có)
-  const verifyToken = crypto.randomBytes(24).toString('hex');
-  const verifyTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  // Auto-verify on register — toggle qua env AUTO_VERIFY_EMAIL
+  const otp = generateOTP();
+  const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
   let user: IUser;
   try {
     user = await User.create({
       email,
       name,
+      phone,
+      address,
       passwordHash,
       role: 'buyer',
-      isVerified: config.autoVerifyEmail,
-      verifyToken,
-      verifyTokenExpires,
+      isVerified: false,
+      otp,
+      otpExpiry,
+      otpAttempts: 0,
     });
   } catch (err: any) {
-    // #6: Bắt lỗi duplicate key (E11000) — race condition guard
     if (err?.code === 11000) {
       throw new AppError('Email đã được đăng ký', 409);
     }
     throw err;
   }
-  const out: { token: string; refreshToken: string; user: IUser; verifyToken?: string } = {
-    ...generateTokens({ _id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion } as any),
-    user,
-    verifyToken,
-  };
-  return out;
+
+  // Send OTP via email — fire and forget, không block response
+  console.log(`[DEV] OTP for ${email}: ${otp}`);
+  sendOTP(email, otp).catch((e) => {
+    console.error('Failed to send OTP email:', e);
+  });
+
+  return { userId: user._id.toString(), email: user.email };
 };
 
 export const loginLocal = async (
@@ -183,4 +194,92 @@ export const verifyEmailWithToken = async (token: string): Promise<void> => {
   user.verifyToken = undefined;
   user.verifyTokenExpires = undefined;
   await user.save();
+};
+
+// ── OTP Verification ──
+
+export const verifyOTP = async (
+  email: string,
+  otp: string
+): Promise<{ token: string; refreshToken: string; user: IUser }> => {
+  // Validate OTP format
+  if (!/^\d{6}$/.test(otp)) {
+    throw new AppError('Mã OTP phải là 6 chữ số', 400);
+  }
+
+  const user = await User.findOne({ email })
+    .select('+otp +otpExpiry +otpAttempts +otpLockedUntil');
+
+  if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
+
+  // Check if account is locked
+  if (user.otpLockedUntil && user.otpLockedUntil > new Date()) {
+    const remaining = Math.ceil((user.otpLockedUntil.getTime() - Date.now()) / 1000);
+    throw new AppError(`Tài khoản bị khóa. Thử lại sau ${remaining} giây`, 429);
+  }
+
+  // Check OTP
+  if (user.otp !== otp) {
+    const attempts = (user.otpAttempts || 0) + 1;
+    user.otpAttempts = attempts;
+
+    // Lock after 5 failed attempts
+    if (attempts >= 5) {
+      user.otpLockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      user.otpAttempts = 0;
+      await user.save();
+      throw new AppError('Quá nhiều lần thử sai. Tài khoản bị khóa 15 phút', 429);
+    }
+
+    await user.save();
+    throw new AppError(`Mã OTP không đúng. Còn ${5 - attempts} lần thử`, 400);
+  }
+
+  // Check OTP expired
+  if (!user.otpExpiry || user.otpExpiry < new Date()) {
+    throw new AppError('Mã OTP đã hết hạn', 400);
+  }
+
+  // Verify success
+  user.isVerified = true;
+  user.otp = undefined;
+  user.otpExpiry = undefined;
+  user.otpAttempts = 0;
+  user.otpLockedUntil = undefined;
+  await user.save();
+
+  // Generate token
+  const tokens = generateTokens({
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  } as any);
+
+  return { ...tokens, user };
+};
+
+export const resendOTP = async (email: string): Promise<void> => {
+  const user = await User.findOne({ email }).select('+otp +otpExpiry +otpAttempts');
+  if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
+
+  // Rate limit: check if enough time passed since last OTP
+  if (user.otpExpiry) {
+    const lastOTPTime = user.otpExpiry.getTime() - 5 * 60 * 1000;
+    const timePassed = Date.now() - lastOTPTime;
+    if (timePassed < 45 * 1000) { // 45 seconds
+      const waitTime = Math.ceil((45 * 1000 - timePassed) / 1000);
+      throw new AppError(`Vui lòng chờ ${waitTime} giây trước khi gửi lại`, 429);
+    }
+  }
+
+  const otp = generateOTP();
+  const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+
+  user.otp = otp;
+  user.otpExpiry = otpExpiry;
+  user.otpAttempts = 0;
+  await user.save();
+
+  await sendOTP(email, otp);
 };

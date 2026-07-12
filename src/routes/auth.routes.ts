@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, loginLocal, refresh, logout, me, changePassword, forgotPassword, resetPassword, verifyEmail } from '../controllers/auth.controller';
+import { register, loginLocal, refresh, logout, me, changePassword, forgotPassword, resetPassword, verifyEmail, verifyOTP, resendOTP } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import {
@@ -10,11 +10,15 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  verifyOTPSchema,
+  resendOTPSchema,
 } from './auth.schema';
 
 const router = Router();
 
 router.post('/register', validate(registerSchema), register);
+router.post('/verify-otp', validate(verifyOTPSchema), verifyOTP);
+router.post('/resend-otp', validate(resendOTPSchema), resendOTP);
 router.post('/login', validate(loginSchema), loginLocal);
 router.post('/refresh', validate(refreshSchema), refresh);
 router.post('/logout', authenticate, logout);

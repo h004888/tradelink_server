@@ -6,11 +6,13 @@ export interface IListing extends Document {
   price?: number;
   imageUrls: string[];
   category: string;
+  categoryId?: mongoose.Types.ObjectId;
   condition: 'new' | 'likeNew' | 'used';
   type: 'sale' | 'trade' | 'both';
   status: 'active' | 'sold' | 'hidden' | 'draft';
   sellerId: mongoose.Types.ObjectId;
   sellerName: string;
+  location?: string;
   views: number;
   interests: number;
   saves: number;
@@ -27,11 +29,13 @@ const listingSchema = new Schema<IListing>(
     price: { type: Number },
     imageUrls: [{ type: String }],
     category: { type: String, required: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
     condition: { type: String, enum: ['new', 'likeNew', 'used'], default: 'used' },
     type: { type: String, enum: ['sale', 'trade', 'both'], default: 'sale' },
     status: { type: String, enum: ['active', 'sold', 'hidden', 'draft'], default: 'active' },
     sellerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     sellerName: { type: String, required: true },
+    location: { type: String },
     views: { type: Number, default: 0 },
     interests: { type: Number, default: 0 },
     saves: { type: Number, default: 0 },
