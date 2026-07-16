@@ -4,6 +4,7 @@ export interface IListing extends Document {
   title: string;
   description: string;
   price?: number;
+  exchangeFor?: string;
   imageUrls: string[];
   category: string;
   categoryId?: mongoose.Types.ObjectId;
@@ -27,6 +28,7 @@ const listingSchema = new Schema<IListing>(
     title: { type: String, required: true },
     description: { type: String, required: true },
     price: { type: Number },
+    exchangeFor: { type: String },
     imageUrls: [{ type: String }],
     category: { type: String, required: true },
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
