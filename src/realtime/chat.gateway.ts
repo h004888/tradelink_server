@@ -1,6 +1,8 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { User } from '../models/user.model';
+import { Conversation } from '../models/conversation.model';
 import * as chatService from '../services/chat.service';
 
 /**
@@ -17,13 +19,19 @@ export class ChatGateway {
       cors: { origin: '*', methods: ['GET', 'POST'] },
     });
 
-    // Auth middleware
-    this.io.use((socket, next) => {
+    // Auth middleware — verify JWT + check tokenVersion để vô hiệu hóa token cũ
+    this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth?.token || socket.handshake.query?.token;
         if (!token) return next(new Error('NO_TOKEN'));
-        const payload = jwt.verify(String(token), config.jwt.secret) as { id: string; email: string };
-        (socket as any).user = payload;
+        const payload = jwt.verify(String(token), config.jwt.secret) as { id: string; email: string; tokenVersion?: number };
+        // Verify tokenVersion — nếu user đã đổi mật khẩu, token cũ bị từ chối
+        const user = await User.findById(payload.id).select('tokenVersion');
+        if (!user) return next(new Error('INVALID_TOKEN'));
+        if (payload.tokenVersion !== undefined && user.tokenVersion !== payload.tokenVersion) {
+          return next(new Error('TOKEN_REVOKED'));
+        }
+        (socket as any).user = { ...payload, tokenVersion: user.tokenVersion };
         next();
       } catch (err) {
         next(new Error('INVALID_TOKEN'));
@@ -51,7 +59,20 @@ export class ChatGateway {
           ack?.({ success: false, message: 'Thiếu conversationId hoặc text' });
           return;
         }
-        const name = (user as any).name || user.email.split('@')[0];
+        // Membership check: socket user phải là participant của conversation
+        const conv = await Conversation.findById(payload.conversationId);
+        if (!conv) {
+          ack?.({ success: false, message: 'Không tìm thấy hội thoại' });
+          return;
+        }
+        const isParticipant = conv.participants.some((p) => p.toString() === user.id);
+        if (!isParticipant) {
+          ack?.({ success: false, message: 'Bạn không có quyền gửi tin nhắn vào hội thoại này' });
+          return;
+        }
+        // Lấy tên user từ DB để hiển thị chính xác
+        const senderDoc = await User.findById(user.id).select('name');
+        const name = senderDoc?.name || user.email.split('@')[0];
         const msg = await chatService.sendMessage(
           payload.conversationId,
           user.id,
