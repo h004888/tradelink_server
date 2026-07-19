@@ -2,10 +2,16 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
   email: string;
-  name: string;
+  fullName: string;
   passwordHash?: string;
   role: 'buyer' | 'seller' | 'admin';
   avatarUrl?: string;
+  badges: string[];
+  settings: {
+    notifications: boolean;
+    language: string;
+  };
+  hasSeenOnboarding: boolean;
   phone?: string;
   address?: string;
   latitude?: number;
@@ -39,10 +45,16 @@ export interface IUser extends Document {
 const userSchema = new Schema<IUser>(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    name: { type: String, required: true },
+    fullName: { type: String, required: true, trim: true },
     passwordHash: { type: String },
     role: { type: String, enum: ['buyer', 'seller', 'admin'], default: 'buyer' },
     avatarUrl: { type: String },
+    badges: { type: [String], default: [] },
+    settings: {
+      notifications: { type: Boolean, default: true },
+      language: { type: String, default: 'vi' },
+    },
+    hasSeenOnboarding: { type: Boolean, default: false },
     phone: { type: String },
     address: { type: String },
     latitude: { type: Number },

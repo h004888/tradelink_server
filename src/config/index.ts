@@ -16,6 +16,9 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+  },
   bcrypt: {
     rounds: parseInt(process.env.BCRYPT_ROUNDS || '10', 10),
   },

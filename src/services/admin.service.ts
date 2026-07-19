@@ -49,9 +49,9 @@ export const getFlaggedListings = async () => {
 /**
  * H6 — Admin tạo user (cho phép chỉ định role).
  */
-export const createUser = async (data: { email: string; name: string; password: string; role?: 'buyer' | 'seller' | 'admin' }): Promise<IUser> => {
-  if (!data.email || !data.name || !data.password) {
-    throw new AppError('Thiếu email/name/password', 400);
+export const createUser = async (data: { email: string; fullName: string; password: string; role?: 'buyer' | 'seller' | 'admin' }): Promise<IUser> => {
+  if (!data.email || !data.fullName || !data.password) {
+    throw new AppError('Thiếu email/fullName/password', 400);
   }
   if (data.password.length < 6) throw new AppError('Mật khẩu tối thiểu 6 ký tự', 400);
   const exists = await User.findOne({ email: data.email });
@@ -59,7 +59,7 @@ export const createUser = async (data: { email: string; name: string; password: 
   const passwordHash = await bcrypt.hash(data.password, config.bcrypt.rounds);
   const user = await User.create({
     email: data.email,
-    name: data.name,
+    fullName: data.fullName,
     passwordHash,
     role: data.role || 'buyer',
     isVerified: true,

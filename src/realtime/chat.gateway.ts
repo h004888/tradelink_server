@@ -71,8 +71,8 @@ export class ChatGateway {
           return;
         }
         // Lấy tên user từ DB để hiển thị chính xác
-        const senderDoc = await User.findById(user.id).select('name');
-        const name = senderDoc?.name || user.email.split('@')[0];
+        const senderDoc = await User.findById(user.id).select('fullName');
+        const name = senderDoc?.fullName || user.email.split('@')[0];
         const msg = await chatService.sendMessage(
           payload.conversationId,
           user.id,

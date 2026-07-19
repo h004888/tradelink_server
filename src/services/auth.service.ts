@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { User, IUser } from '../models/user.model';
 import { Listing } from '../models/listing.model';
 import { Transaction } from '../models/transaction.model';
@@ -13,10 +14,12 @@ const generateOTP = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+const googleClient = new OAuth2Client(config.google.clientId || undefined);
+
 export const register = async (
   email: string,
   password: string,
-  name: string,
+  fullName: string,
   phone: string,
   address?: string
 ): Promise<{ userId: string; email: string }> => {
@@ -31,10 +34,11 @@ export const register = async (
   try {
     user = await User.create({
       email,
-      name,
+      fullName,
       phone,
       address,
       passwordHash,
+      // TODO: Review whether forcing every self-registered account to `buyer` is still correct for the product flow.
       role: 'buyer',
       isVerified: false,
       otp,
@@ -83,6 +87,72 @@ export const loginLocal = async (
   };
 };
 
+export const loginWithGoogle = async (
+  idToken: string,
+): Promise<{ token: string; refreshToken: string; user: IUser }> => {
+  if (!config.google.clientId) {
+    throw new AppError('GOOGLE_CLIENT_ID chưa được cấu hình', 500);
+  }
+
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: config.google.clientId,
+    });
+  } catch {
+    throw new AppError('Google ID Token không hợp lệ', 401);
+  }
+
+  const payload = ticket.getPayload();
+  if (!payload?.email) {
+    throw new AppError('Không lấy được email từ tài khoản Google', 400);
+  }
+
+  const email = payload.email.toLowerCase().trim();
+  let user = await User.findOne({ email });
+
+  if (!user) {
+    const fullName = payload.name?.trim() || email.split('@')[0];
+    user = await User.create({
+      email,
+      fullName,
+      avatarUrl: payload.picture,
+      isVerified: payload.email_verified ?? true,
+      // TODO: Review whether forcing every self-registered account to `buyer` is still correct for the product flow.
+      role: 'buyer',
+    });
+  } else {
+    const updatePayload: Record<string, unknown> = {};
+    if (!user.fullName && payload.name?.trim()) {
+      updatePayload.fullName = payload.name.trim();
+    }
+    if (!user.avatarUrl && payload.picture) {
+      updatePayload.avatarUrl = payload.picture;
+    }
+    if (!user.isVerified && payload.email_verified) {
+      updatePayload.isVerified = true;
+    }
+
+    if (Object.keys(updatePayload).length > 0) {
+      user = await User.findByIdAndUpdate(
+        user._id,
+        { $set: updatePayload },
+        { new: true },
+      );
+    }
+  }
+
+  if (!user) {
+    throw new AppError('Không thể xử lý đăng nhập Google', 500);
+  }
+
+  return {
+    ...generateTokens(user),
+    user,
+  };
+};
+
 export const refreshAccessToken = async (refreshToken: string): Promise<{ token: string; refreshToken: string; user: IUser }> => {
   const payload = verifyRefreshToken(refreshToken);
   const user = await User.findById(payload.id);
@@ -101,7 +171,21 @@ export const refreshAccessToken = async (refreshToken: string): Promise<{ token:
   return { ...tokens, user: updatedUser };
 };
 
-export const getMe = async (userId: string): Promise<IUser & { totalListings: number; totalTransactions: number; successRate: number }> => {
+export const logout = async (userId: string): Promise<void> => {
+  // Refresh token hiện là JWT stateless, không có store riêng để delete.
+  // Việc tăng tokenVersion sẽ revoke ngay toàn bộ access token và refresh token cũ của user.
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $inc: { tokenVersion: 1 } },
+    { new: true },
+  ).select('_id');
+
+  if (!user) {
+    throw new AppError('Không tìm thấy người dùng', 404);
+  }
+};
+
+export const getMe = async (userId: string): Promise<Record<string, unknown>> => {
   const user = await User.findById(userId);
   if (!user) throw new AppError('Không tìm thấy người dùng', 404);
 
@@ -119,11 +203,25 @@ export const getMe = async (userId: string): Promise<IUser & { totalListings: nu
     ? Math.round((completedTransactions / totalTransactions) * 100)
     : 100;
 
-  const result: any = user.toObject();
-  result.totalListings = totalListings;
-  result.totalTransactions = totalTransactions;
-  result.successRate = successRate;
-  return result as IUser & { totalListings: number; totalTransactions: number; successRate: number };
+  const {
+    avatarUrl,
+    reputationScore,
+    totalTransactions: persistedTotalTransactions,
+    badges,
+    ...rest
+  } = user.toObject();
+
+  return {
+    ...rest,
+    avatar: avatarUrl ?? null,
+    fullName: user.fullName,
+    uyTinScore: reputationScore ?? 0,
+    successfulTransactions: persistedTotalTransactions ?? 0,
+    badges: badges ?? [],
+    totalListings,
+    totalTransactions,
+    successRate,
+  };
 };
 
 /**
