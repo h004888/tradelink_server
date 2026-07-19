@@ -7,7 +7,7 @@ const tokenStr = z.string('Token không được để trống').min(1, 'Token k
 export const registerSchema = z.object({
   email: emailStr('Email không được để trống'),
   password: passwordStr,
-  name: z.string('Tên không được để trống').min(2, 'Tên phải từ 2 ký tự').max(100, 'Tên tối đa 100 ký tự'),
+  fullName: z.string('Họ và tên không được để trống').min(2, 'Họ và tên phải từ 2 ký tự').max(100, 'Họ và tên tối đa 100 ký tự'),
   phone: z.string('Số điện thoại không được để trống')
     .regex(/^(0[3|5|7|8|9])+([0-9]{8})$/, 'Số điện thoại không hợp lệ'),
   address: z.string().optional(),
@@ -16,6 +16,10 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: emailStr('Email không được để trống'),
   password: z.string('Mật khẩu không được để trống').min(1, 'Mật khẩu không được để trống'),
+});
+
+export const googleAuthSchema = z.object({
+  idToken: z.string('Thiếu Google ID Token').min(1, 'Google ID Token không được để trống'),
 });
 
 export const refreshSchema = z.object({

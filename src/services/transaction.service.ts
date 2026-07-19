@@ -153,7 +153,7 @@ export const confirmTrade = async (id: string, userId: string, party: 'A' | 'B',
 };
 
 export const findAll = async () => {
-  return Transaction.find().sort({ createdAt: -1 }).populate('buyerId', 'name phone').populate('sellerId', 'name phone');
+  return Transaction.find().sort({ createdAt: -1 }).populate('buyerId', 'fullName phone').populate('sellerId', 'fullName phone');
 };
 
 /**

@@ -14,10 +14,10 @@ export const getDashboard = async () => {
     User.countDocuments(),
     Transaction.countDocuments(),
     Dispute.find({ status: 'open' }).sort({ priority: -1, createdAt: -1 }).limit(10)
-      .populate('raisedBy', 'name phone')
+      .populate('raisedBy', 'fullName phone')
       .populate('transactionId', 'type listingTitle'),
     Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 }).limit(10)
-      .populate('sellerId', 'name phone'),
+      .populate('sellerId', 'fullName phone'),
     Dispute.countDocuments({ status: 'open' }), // pending reviews = all open disputes for now
   ]);
 
@@ -38,8 +38,8 @@ export const getAllUsers = async () => {
 
 export const getAllTransactions = async () => {
   return Transaction.find().sort({ createdAt: -1 })
-    .populate('buyerId', 'name phone')
-    .populate('sellerId', 'name phone');
+    .populate('buyerId', 'fullName phone')
+    .populate('sellerId', 'fullName phone');
 };
 
 /**
@@ -49,8 +49,8 @@ export const getAllTransactions = async () => {
 export const getPendingPayouts = async () => {
   return Transaction.find({ type: 'sale', escrowStep: 'released', payoutStatus: 'pending' })
     .sort({ updatedAt: 1 })
-    .populate('sellerId', 'name phone bankName bankAccountNumber bankAccountHolder')
-    .populate('buyerId', 'name phone');
+    .populate('sellerId', 'fullName phone bankName bankAccountNumber bankAccountHolder')
+    .populate('buyerId', 'fullName phone');
 };
 
 /**
@@ -70,7 +70,7 @@ export const markPayoutPaid = async (id: string) => {
 
 export const getFlaggedListings = async () => {
   return Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 })
-    .populate('sellerId', 'name phone');
+    .populate('sellerId', 'fullName phone');
 };
 
 /**
@@ -103,9 +103,9 @@ export const moderateListing = async (id: string, action: 'approve' | 'reject'):
 /**
  * H6 — Admin tạo user (cho phép chỉ định role).
  */
-export const createUser = async (data: { email: string; name: string; password: string; role?: 'user' | 'admin' }): Promise<IUser> => {
-  if (!data.email || !data.name || !data.password) {
-    throw new AppError('Thiếu email/name/password', 400);
+export const createUser = async (data: { email: string; fullName: string; password: string; role?: 'user' | 'admin' }): Promise<IUser> => {
+  if (!data.email || !data.fullName || !data.password) {
+    throw new AppError('Thiếu email/fullName/password', 400);
   }
   if (data.password.length < 6) throw new AppError('Mật khẩu tối thiểu 6 ký tự', 400);
   const exists = await User.findOne({ email: data.email });
@@ -113,7 +113,7 @@ export const createUser = async (data: { email: string; name: string; password: 
   const passwordHash = await bcrypt.hash(data.password, config.bcrypt.rounds);
   const user = await User.create({
     email: data.email,
-    name: data.name,
+    fullName: data.fullName,
     passwordHash,
     role: data.role || 'user',
     isVerified: true,

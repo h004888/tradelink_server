@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as listingService from '../services/listing.service';
 import { AuthRequest } from '../middlewares/auth';
+import { User } from '../models/user.model';
 
 export const getListings = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -47,7 +48,8 @@ export const getListing = async (req: Request, res: Response, next: NextFunction
 
 export const createListing = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const listing = await listingService.create({ ...req.body, sellerId: req.user!.id, sellerName: (req.user as any).name || 'Unknown' });
+    const seller = await User.findById(req.user!.id).select('fullName');
+    const listing = await listingService.create({ ...req.body, sellerId: req.user!.id, sellerName: seller?.fullName || 'Unknown' });
     res.status(201).json({ success: true, data: listing });
   } catch (err) { next(err); }
 };

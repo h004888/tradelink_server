@@ -43,7 +43,7 @@ export const create = async (data: { transactionId: string; raisedBy: string; re
 
 export const findByTransaction = async (transactionId: string) => {
   const dispute = await Dispute.findOne({ transactionId })
-    .populate('raisedBy', 'name phone')
+    .populate('raisedBy', 'fullName phone')
     .populate('transactionId');
   if (!dispute) throw new AppError('Không tìm thấy khiếu nại', 404);
   return dispute;

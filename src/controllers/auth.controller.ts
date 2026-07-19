@@ -4,8 +4,8 @@ import { AuthRequest } from '../middlewares/auth';
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, phone, address } = req.body;
-    const data = await authService.register(email, password, name, phone, address);
+    const { email, password, fullName, phone, address } = req.body;
+    const data = await authService.register(email, password, fullName, phone, address);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -18,6 +18,14 @@ export const loginLocal = async (req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 };
 
+export const loginWithGoogle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { idToken } = req.body;
+    const data = await authService.loginWithGoogle(idToken);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
@@ -26,8 +34,23 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
   } catch (err) { next(err); }
 };
 
-export const logout = async (_req: AuthRequest, res: Response) => {
-  res.json({ success: true, message: 'Đăng xuất thành công' });
+export const logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await authService.logout(req.user!.id);
+
+    // Best-effort clear cookies in case frontend stores tokens in cookies.
+    const clearOptions = {
+      httpOnly: true,
+      sameSite: 'lax' as const,
+      secure: process.env.NODE_ENV === 'production',
+    };
+
+    res.clearCookie('token', clearOptions);
+    res.clearCookie('accessToken', clearOptions);
+    res.clearCookie('refreshToken', clearOptions);
+
+    res.json({ success: true, message: 'Đăng xuất thành công' });
+  } catch (err) { next(err); }
 };
 
 export const me = async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -74,14 +74,14 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
   }
 
   try {
-    const buyer = await User.findById(offer.buyerId).select('name');
+    const buyer = await User.findById(offer.buyerId).select('fullName');
 
     const tx = await Transaction.create({
       type: transactionType,
       listingId: listing._id,
       listingTitle: listing.title,
       buyerId: offer.buyerId,
-      buyerName: buyer?.name ?? 'Unknown',
+      buyerName: buyer?.fullName ?? 'Unknown',
       sellerId: listing.sellerId,
       sellerName: listing.sellerName,
       amount: transactionType === 'sale' ? (offer.price ?? listing.price) : undefined,
@@ -110,7 +110,7 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
 };
 
 export const findByListing = async (listingId: string) => {
-  return Offer.find({ listingId }).sort({ createdAt: -1 }).populate('buyerId', 'name phone');
+  return Offer.find({ listingId }).sort({ createdAt: -1 }).populate('buyerId', 'fullName phone');
 };
 
 export const findByBuyer = async (buyerId: string) => {
@@ -127,6 +127,6 @@ export const findReceivedBySeller = async (sellerId: string) => {
   const listingIds = listings.map((l) => l._id);
   return Offer.find({ listingId: { $in: listingIds } })
     .sort({ createdAt: -1 })
-    .populate('buyerId', 'name phone')
+    .populate('buyerId', 'fullName phone')
     .populate('listingId', 'title price');
 };

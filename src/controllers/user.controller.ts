@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as userService from '../services/user.service';
 import { buildPublicUrl } from '../middlewares/upload';
 import { AppError } from '../utils/AppError';
+import { AuthRequest } from '../middlewares/auth';
 
 export const getUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -10,19 +11,27 @@ export const getUser = async (req: Request, res: Response, next: NextFunction) =
   } catch (err) { next(err); }
 };
 
-export const updateUser = async (req: Request, res: Response, next: NextFunction) => {
+export const updateUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await userService.update(req.params.id as string, req.body);
+    if (!req.user) {
+      throw new AppError('Vui lòng đăng nhập để truy cập', 401);
+    }
+
+    const user = await userService.updateProfile(req.user.id, req.body);
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
 };
 
 /**
- * PUT /users/:id/avatar — multipart/form-data với field `image`.
+ * PUT /users/profile/avatar — multipart/form-data với field `image`.
  * Nếu không có file, có thể dùng body `{ avatarUrl: string }` (legacy).
  */
-export const updateAvatar = async (req: Request, res: Response, next: NextFunction) => {
+export const updateAvatar = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.user) {
+      throw new AppError('Vui lòng đăng nhập để truy cập', 401);
+    }
+
     const file = (req as any).file as Express.Multer.File | undefined;
     let avatarUrl: string | undefined;
     if (file) {
@@ -32,7 +41,19 @@ export const updateAvatar = async (req: Request, res: Response, next: NextFuncti
     } else {
       throw new AppError('Thiếu file ảnh (field "image") hoặc avatarUrl trong body', 400);
     }
-    const user = await userService.updateAvatar(req.params.id as string, avatarUrl);
+
+    const user = await userService.updateAvatar(req.user.id, avatarUrl);
+    res.json({ success: true, data: user });
+  } catch (err) { next(err); }
+};
+
+export const updateSettings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new AppError('Vui lòng đăng nhập để truy cập', 401);
+    }
+
+    const user = await userService.updateSettings(req.user.id, req.body);
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
 };

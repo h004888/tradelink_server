@@ -128,5 +128,5 @@ export const boost = async (id: string, sellerId: string, days: number): Promise
 };
 
 export const getFlagged = async () => {
-  return Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 }).populate('sellerId', 'name phone');
+  return Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 }).populate('sellerId', 'fullName phone');
 };
