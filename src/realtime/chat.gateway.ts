@@ -53,10 +53,10 @@ export class ChatGateway {
     });
 
     // Client có thể emit `send` để gửi realtime (forward tới service + broadcast)
-    socket.on('send', async (payload: { conversationId: string; text: string; isOffer?: boolean; offerListingId?: string }, ack?: (res: any) => void) => {
+    socket.on('send', async (payload: { conversationId: string; text: string; isOffer?: boolean; offerListingId?: string; imageUrl?: string }, ack?: (res: any) => void) => {
       try {
-        if (!payload?.conversationId || !payload.text) {
-          ack?.({ success: false, message: 'Thiếu conversationId hoặc text' });
+        if (!payload?.conversationId || (!payload.text && !payload.imageUrl)) {
+          ack?.({ success: false, message: 'Thiếu conversationId hoặc nội dung tin nhắn' });
           return;
         }
         // Membership check: socket user phải là participant của conversation
@@ -80,6 +80,7 @@ export class ChatGateway {
           payload.text,
           !!payload.isOffer,
           payload.offerListingId,
+          payload.imageUrl,
         );
         const out = {
           _id: String(msg._id),
@@ -87,6 +88,7 @@ export class ChatGateway {
           senderId: String(msg.senderId),
           senderName: msg.senderName,
           text: msg.text,
+          imageUrl: msg.imageUrl ?? null,
           isOffer: msg.isOffer,
           offerListingId: msg.offerListingId ? String(msg.offerListingId) : null,
           createdAt: msg.createdAt,
@@ -99,6 +101,22 @@ export class ChatGateway {
       }
     });
 
+    // Client emit `read` khi mở/scroll tới cuối conversation → đánh dấu đã đọc + báo cho người gửi
+    socket.on('read', async (payload: { conversationId: string }) => {
+      try {
+        if (!payload?.conversationId) return;
+        const messageIds = await chatService.markAsRead(payload.conversationId, user.id);
+        if (messageIds.length === 0) return;
+        this.io?.to(`conv:${payload.conversationId}`).emit('message:read', {
+          conversationId: payload.conversationId,
+          readerId: user.id,
+          messageIds,
+        });
+      } catch {
+        // best-effort — không cần ack
+      }
+    });
+
     socket.on('disconnect', () => {
       // cleanup rooms auto khi disconnect — không cần xử lý thêm
     });
@@ -108,6 +126,12 @@ export class ChatGateway {
   broadcastMessage(conversationId: string, msg: any): void {
     if (!this.io) return;
     this.io.to(`conv:${conversationId}`).emit('message:new', msg);
+  }
+
+  /** Được gọi từ REST controller khi có tin nhắn được đánh dấu đã đọc qua HTTP. */
+  broadcastRead(conversationId: string, readerId: string, messageIds: string[]): void {
+    if (!this.io || messageIds.length === 0) return;
+    this.io.to(`conv:${conversationId}`).emit('message:read', { conversationId, readerId, messageIds });
   }
 }
 

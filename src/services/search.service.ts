@@ -8,6 +8,7 @@ export const search = async (params: {
   categoryId?: string;
   minPrice?: number;
   maxPrice?: number;
+  sort?: string;
   page?: number;
   limit?: number;
 }) => {
@@ -23,12 +24,20 @@ export const search = async (params: {
     if (params.maxPrice !== undefined) query.price.$lte = params.maxPrice;
   }
 
+  let sort: any = { boostExpiry: -1, createdAt: -1 };
+  switch (params.sort) {
+    case 'price_asc': sort = { price: 1 }; break;
+    case 'price_desc': sort = { price: -1 }; break;
+    case 'popular': sort = { views: -1, saves: -1 }; break;
+    case 'newest': sort = { createdAt: -1 }; break;
+  }
+
   const page = params.page || 1;
   const limit = params.limit || 20;
   const skip = (page - 1) * limit;
 
   const [listings, total] = await Promise.all([
-    Listing.find(query).sort({ boostExpiry: -1, createdAt: -1 }).skip(skip).limit(limit),
+    Listing.find(query).sort(sort).skip(skip).limit(limit),
     Listing.countDocuments(query),
   ]);
 

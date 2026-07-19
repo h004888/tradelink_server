@@ -48,7 +48,10 @@ export const getMessages = async (req: AuthRequest, res: Response, next: NextFun
 
 export const sendMessage = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { text, isOffer, offerListingId } = req.body;
+    const { text, isOffer, offerListingId, imageUrl } = req.body;
+    if (!text && !imageUrl) {
+      throw new AppError('Tin nhắn cần có nội dung hoặc ảnh', 400);
+    }
     const conversationId = String(req.params.id);
 
     // Authorization: user phải là participant của conversation
@@ -68,7 +71,7 @@ export const sendMessage = async (req: AuthRequest, res: Response, next: NextFun
     const sender = await User.findById(userId).select('name');
     const senderName = sender?.name ?? 'Unknown';
 
-    const msg = await chatService.sendMessage(conversationId, userId, senderName, text, isOffer, offerListingId);
+    const msg = await chatService.sendMessage(conversationId, userId, senderName, text, isOffer, offerListingId, imageUrl);
     // E5/K1 — broadcast realtime (nếu gateway đã được attach)
     try {
       const { chatGateway } = await import('../realtime');
@@ -78,11 +81,34 @@ export const sendMessage = async (req: AuthRequest, res: Response, next: NextFun
         senderId: String(msg.senderId),
         senderName: msg.senderName,
         text: msg.text,
+        imageUrl: msg.imageUrl ?? null,
         isOffer: msg.isOffer,
         offerListingId: msg.offerListingId ? String(msg.offerListingId) : null,
         createdAt: msg.createdAt,
       });
     } catch { /* gateway chưa sẵn sàng — bỏ qua */ }
     res.status(201).json({ success: true, data: msg });
+  } catch (err) { next(err); }
+};
+
+export const markRead = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const conversationId = String(req.params.id);
+    const conv = await Conversation.findById(conversationId);
+    if (!conv) {
+      throw new AppError('Không tìm thấy hội thoại', 404);
+    }
+    const userId = String(req.user!.id);
+    const isParticipant = conv.participants.some((p) => p.toString() === userId);
+    if (!isParticipant) {
+      throw new AppError('Bạn không có quyền truy cập hội thoại này', 403);
+    }
+
+    const messageIds = await chatService.markAsRead(conversationId, userId);
+    try {
+      const { chatGateway } = await import('../realtime');
+      chatGateway.broadcastRead(conversationId, userId, messageIds);
+    } catch { /* gateway chưa sẵn sàng — bỏ qua */ }
+    res.json({ success: true, data: { messageIds } });
   } catch (err) { next(err); }
 };
