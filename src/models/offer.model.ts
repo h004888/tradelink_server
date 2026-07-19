@@ -8,6 +8,8 @@ export interface IOffer extends Document {
   cashTopUp?: number;
   type: 'buy' | 'trade';
   message: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  transactionId?: mongoose.Types.ObjectId;
   createdAt: Date;
 }
 
@@ -20,6 +22,8 @@ const offerSchema = new Schema<IOffer>(
     cashTopUp: { type: Number },
     type: { type: String, enum: ['buy', 'trade'], required: true },
     message: { type: String, required: true },
+    status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+    transactionId: { type: Schema.Types.ObjectId, ref: 'Transaction' },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import * as transactionService from '../services/transaction.service';
 import { AuthRequest } from '../middlewares/auth';
+import { User } from '../models/user.model';
 
 export const getTransactions = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -18,7 +19,8 @@ export const getTransaction = async (req: AuthRequest, res: Response, next: Next
 
 export const createTransaction = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const tx = await transactionService.create({ ...req.body, buyerId: req.user!.id, buyerName: (req.user as any).name || 'Unknown' });
+    const buyer = await User.findById(req.user!.id).select('fullName');
+    const tx = await transactionService.create({ ...req.body, buyerId: req.user!.id, buyerName: buyer?.fullName || 'Unknown' });
     res.status(201).json({ success: true, data: tx });
   } catch (err) { next(err); }
 };
@@ -35,5 +37,12 @@ export const confirmTrade = async (req: AuthRequest, res: Response, next: NextFu
     const { party, sent, received } = req.body;
     const tx = await transactionService.confirmTrade(req.params.id as string, req.user!.id, party, sent, received);
     res.json({ success: true, data: tx });
+  } catch (err) { next(err); }
+};
+
+export const getPaymentInfo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const info = await transactionService.getPaymentInfo(req.params.id as string, req.user!.id);
+    res.json({ success: true, data: info });
   } catch (err) { next(err); }
 };

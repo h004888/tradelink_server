@@ -4,7 +4,7 @@ import { AppError } from '../utils/AppError';
 import * as notificationService from './notification.service';
 
 export const getConversations = async (userId: string) => {
-  return Conversation.find({ participants: userId }).sort({ updatedAt: -1 }).populate('participants', 'name avatarUrl');
+  return Conversation.find({ participants: userId }).sort({ updatedAt: -1 }).populate('participants', 'fullName avatarUrl');
 };
 
 export const getOrCreateConversation = async (userId: string, otherUserId: string, listingId?: string): Promise<IConversation> => {

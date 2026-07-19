@@ -6,6 +6,7 @@ import { config } from './config';
 import { connectDB } from './config/database';
 import { logger } from './utils/logger';
 import { attachRealtime } from './realtime';
+import { pollSepayTransactions } from './services/transaction.service';
 
 const PORT = config.port;
 
@@ -21,6 +22,14 @@ const start = async () => {
 
   // Mount socket.io realtime gateways (E5/K1)
   attachRealtime(server);
+
+  // Dự phòng cho webhook SePay: poll API giao dịch mỗi 15s (xem transaction.service.ts)
+  if (config.sepay.apiKey) {
+    setInterval(() => {
+      pollSepayTransactions().catch((err) => logger.error('[SePay poll] Lỗi:', err));
+    }, 15000);
+    logger.info('🔁 SePay polling fallback đã bật (mỗi 15s)');
+  }
 
   // Graceful shutdown
   const shutdown = (signal: string) => {

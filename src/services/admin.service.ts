@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { User, IUser } from '../models/user.model';
 import { Transaction } from '../models/transaction.model';
-import { Listing } from '../models/listing.model';
+import { Listing, IListing } from '../models/listing.model';
 import { Dispute } from '../models/dispute.model';
 import { config } from '../config';
 import { AppError } from '../utils/AppError';
+import * as notificationService from './notification.service';
 
 export const getDashboard = async () => {
   const [pendingDisputes, resolvedToday, totalUsers, totalTransactions, recentDisputes, flaggedListings, pendingReviews] = await Promise.all([
@@ -13,10 +14,10 @@ export const getDashboard = async () => {
     User.countDocuments(),
     Transaction.countDocuments(),
     Dispute.find({ status: 'open' }).sort({ priority: -1, createdAt: -1 }).limit(10)
-      .populate('raisedBy', 'name phone')
+      .populate('raisedBy', 'fullName phone')
       .populate('transactionId', 'type listingTitle'),
     Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 }).limit(10)
-      .populate('sellerId', 'name phone'),
+      .populate('sellerId', 'fullName phone'),
     Dispute.countDocuments({ status: 'open' }), // pending reviews = all open disputes for now
   ]);
 
@@ -37,19 +38,72 @@ export const getAllUsers = async () => {
 
 export const getAllTransactions = async () => {
   return Transaction.find().sort({ createdAt: -1 })
-    .populate('buyerId', 'name phone')
-    .populate('sellerId', 'name phone');
+    .populate('buyerId', 'fullName phone')
+    .populate('sellerId', 'fullName phone');
+};
+
+/**
+ * Giao dịch bán hàng đã 'released' (buyer xác nhận hoàn tất) nhưng admin chưa chuyển
+ * khoản thủ công cho seller — dùng cho màn "Cần thanh toán" trong admin app.
+ */
+export const getPendingPayouts = async () => {
+  return Transaction.find({ type: 'sale', escrowStep: 'released', payoutStatus: 'pending' })
+    .sort({ updatedAt: 1 })
+    .populate('sellerId', 'fullName phone bankName bankAccountNumber bankAccountHolder')
+    .populate('buyerId', 'fullName phone');
+};
+
+/**
+ * Admin xác nhận đã tự chuyển khoản tiền hàng cho seller (thao tác thủ công, không tự
+ * động chuyển tiền thật). Atomic filter theo payoutStatus:'pending' để tránh double-payout
+ * nếu admin bấm 2 lần / 2 tab.
+ */
+export const markPayoutPaid = async (id: string) => {
+  const tx = await Transaction.findOneAndUpdate(
+    { _id: id, payoutStatus: 'pending' },
+    { $set: { payoutStatus: 'paid', payoutAt: new Date() } },
+    { new: true }
+  );
+  if (!tx) throw new AppError('Không tìm thấy giao dịch cần thanh toán hoặc đã được xử lý trước đó', 404);
+  return tx;
 };
 
 export const getFlaggedListings = async () => {
   return Listing.find({ flags: { $gt: 0 } }).sort({ flags: -1 })
-    .populate('sellerId', 'name phone');
+    .populate('sellerId', 'fullName phone');
+};
+
+/**
+ * Admin duyệt tin bị báo cáo: 'approve' = tin hợp lệ, xoá cờ báo cáo và giữ hoạt động;
+ * 'reject' = vi phạm thật, ẩn tin khỏi marketplace.
+ */
+export const moderateListing = async (id: string, action: 'approve' | 'reject'): Promise<IListing> => {
+  const listing = await Listing.findById(id);
+  if (!listing) throw new AppError('Không tìm thấy tin đăng', 404);
+
+  listing.flags = 0;
+  if (action === 'reject') {
+    listing.status = 'hidden';
+  }
+  await listing.save();
+
+  await notificationService.create({
+    userId: listing.sellerId.toString(),
+    type: 'system',
+    title: action === 'approve' ? 'Tin đăng đã được duyệt' : 'Tin đăng đã bị gỡ',
+    body: action === 'approve'
+      ? `Tin "${listing.title}" đã được admin xem xét và giữ nguyên hoạt động.`
+      : `Tin "${listing.title}" đã bị gỡ do vi phạm quy định.`,
+    relatedId: listing._id.toString(),
+  }).catch((err) => console.error('Moderation notification failed:', err));
+
+  return listing;
 };
 
 /**
  * H6 — Admin tạo user (cho phép chỉ định role).
  */
-export const createUser = async (data: { email: string; fullName: string; password: string; role?: 'buyer' | 'seller' | 'admin' }): Promise<IUser> => {
+export const createUser = async (data: { email: string; fullName: string; password: string; role?: 'user' | 'admin' }): Promise<IUser> => {
   if (!data.email || !data.fullName || !data.password) {
     throw new AppError('Thiếu email/fullName/password', 400);
   }
@@ -61,7 +115,7 @@ export const createUser = async (data: { email: string; fullName: string; passwo
     email: data.email,
     fullName: data.fullName,
     passwordHash,
-    role: data.role || 'buyer',
+    role: data.role || 'user',
     isVerified: true,
   });
   return user;
@@ -79,7 +133,7 @@ export const deleteUser = async (id: string): Promise<void> => {
  * H7 — Admin đổi vai trò người dùng.
  */
 export const updateRole = async (id: string, role: string): Promise<IUser> => {
-  if (!['buyer', 'seller', 'admin'].includes(role)) {
+  if (!['user', 'admin'].includes(role)) {
     throw new AppError('Vai trò không hợp lệ', 400);
   }
   const user = await User.findByIdAndUpdate(id, { $set: { role } }, { new: true }).select('-passwordHash');

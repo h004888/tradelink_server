@@ -26,3 +26,19 @@ export const getOffers = async (req: Request, res: Response, next: NextFunction)
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
+
+/**
+ * PATCH /offers/:id/respond — seller chấp nhận/từ chối 1 offer.
+ * body: { action: 'accept' | 'reject' }
+ * Chấp nhận → tạo luôn Transaction (sale dùng giá đã thương lượng / trade).
+ */
+export const respondOffer = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const action = req.body?.action;
+    if (action !== 'accept' && action !== 'reject') {
+      return res.status(400).json({ success: false, message: 'action phải là "accept" hoặc "reject"' });
+    }
+    const result = await offerService.respond(req.params.id as string, req.user!.id, action === 'accept');
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+};

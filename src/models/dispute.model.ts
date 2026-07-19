@@ -8,6 +8,9 @@ export interface IDispute extends Document {
   priority: boolean;
   status: 'open' | 'resolved' | 'closed';
   resolution?: string;
+  decision?: 'refund' | 'release' | 'reject';
+  attachments?: string[];
+  chatLogSnapshot?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +24,9 @@ const disputeSchema = new Schema<IDispute>(
     priority: { type: Boolean, default: false },
     status: { type: String, enum: ['open', 'resolved', 'closed'], default: 'open' },
     resolution: { type: String },
+    decision: { type: String, enum: ['refund', 'release', 'reject'] },
+    attachments: [{ type: String }],
+    chatLogSnapshot: { type: String },
   },
   { timestamps: true }
 );

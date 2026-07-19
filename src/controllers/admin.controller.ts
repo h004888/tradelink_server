@@ -24,9 +24,23 @@ export const getTransactions = async (_req: AuthRequest, res: Response, next: Ne
   } catch (err) { next(err); }
 };
 
+export const getPendingPayouts = async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const payouts = await adminService.getPendingPayouts();
+    res.json({ success: true, data: payouts });
+  } catch (err) { next(err); }
+};
+
+export const markPayoutPaid = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tx = await adminService.markPayoutPaid(req.params.id as string);
+    res.json({ success: true, data: tx });
+  } catch (err) { next(err); }
+};
+
 export const resolveDispute = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const dispute = await disputeService.resolve(req.params.id as string, req.body.resolution);
+    const dispute = await disputeService.resolve(req.params.id as string, req.body.resolution, req.body.decision);
     res.json({ success: true, data: dispute });
   } catch (err) { next(err); }
 };
@@ -35,6 +49,20 @@ export const getFlaggedListings = async (_req: AuthRequest, res: Response, next:
   try {
     const listings = await adminService.getFlaggedListings();
     res.json({ success: true, data: listings });
+  } catch (err) { next(err); }
+};
+
+/**
+ * PATCH /admin/listings/:id/moderate — body: { action: 'approve' | 'reject' }
+ */
+export const moderateListing = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const action = req.body?.action;
+    if (action !== 'approve' && action !== 'reject') {
+      return res.status(400).json({ success: false, message: 'action phải là "approve" hoặc "reject"' });
+    }
+    const listing = await adminService.moderateListing(req.params.id as string, action);
+    res.json({ success: true, data: listing });
   } catch (err) { next(err); }
 };
 
@@ -59,7 +87,7 @@ export const deleteUser = async (req: AuthRequest, res: Response, next: NextFunc
 };
 
 /**
- * PATCH /admin/users/:id/role — body: { role: 'buyer' | 'seller' | 'admin' }
+ * PATCH /admin/users/:id/role — body: { role: 'user' | 'admin' }
  */
 export const updateRole = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import {
   getDashboard, getUsers, getTransactions,
-  resolveDispute, getFlaggedListings,
+  resolveDispute, getFlaggedListings, moderateListing,
   createUser, deleteUser, updateRole,
+  getPendingPayouts, markPayoutPaid,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 
@@ -13,8 +14,11 @@ router.use(authenticate, authorize('admin'));
 router.get('/dashboard', getDashboard);
 router.get('/users', getUsers);
 router.get('/transactions', getTransactions);
+router.get('/payouts', getPendingPayouts);
+router.patch('/payouts/:id/mark-paid', markPayoutPaid);
 router.patch('/disputes/:id', resolveDispute);
 router.get('/listings/flagged', getFlaggedListings);
+router.patch('/listings/:id/moderate', moderateListing);
 // H6 — admin create/delete user
 router.post('/users', createUser);
 router.delete('/users/:id', deleteUser);

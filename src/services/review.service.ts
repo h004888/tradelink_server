@@ -32,7 +32,7 @@ export const create = async (data: {
 };
 
 export const findByUser = async (userId: string) => {
-  return Review.find({ targetId: userId }).sort({ createdAt: -1 }).populate('reviewerId', 'name avatarUrl');
+  return Review.find({ targetId: userId }).sort({ createdAt: -1 }).populate('reviewerId', 'fullName avatarUrl');
 };
 
 export const getPendingCount = async () => {

@@ -13,6 +13,7 @@ import reviewRoutes from './review.routes';
 import adminRoutes from './admin.routes';
 import uploadRoutes from './upload.routes';
 import categoryRoutes from './category.routes';
+import webhookRoutes from './webhook.routes';
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use('/reviews', reviewRoutes);
 router.use('/admin', adminRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/categories', categoryRoutes);
+router.use('/webhooks', webhookRoutes);
 
 export default router;

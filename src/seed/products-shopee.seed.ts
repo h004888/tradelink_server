@@ -173,7 +173,7 @@ async function seedProducts() {
     seller = await User.create({
       email: 'demo-seller@tradelink.dev',
       fullName: 'Demo Seller',
-      role: 'seller',
+      role: 'user',
       isVerified: true,
       reputationScore: 85,
       totalTransactions: 150,

@@ -43,15 +43,55 @@ export const create = async (data: { transactionId: string; raisedBy: string; re
 
 export const findByTransaction = async (transactionId: string) => {
   const dispute = await Dispute.findOne({ transactionId })
-    .populate('raisedBy', 'name phone')
+    .populate('raisedBy', 'fullName phone')
     .populate('transactionId');
   if (!dispute) throw new AppError('Không tìm thấy khiếu nại', 404);
   return dispute;
 };
 
-export const resolve = async (id: string, resolution: string) => {
-  const dispute = await Dispute.findByIdAndUpdate(id, { $set: { status: 'resolved', resolution } }, { new: true });
-  if (!dispute) throw new AppError('Không tìm thấy khiếu nại', 404);
+export const resolve = async (id: string, resolution: string, decision?: 'refund' | 'release' | 'reject') => {
+  // Chỉ resolve được khiếu nại đang 'open' — atomic, tránh xử lý trùng (vd 2 admin cùng bấm)
+  // gây hoàn tiền/giải ngân lặp lại trên cùng 1 giao dịch.
+  const dispute = await Dispute.findOneAndUpdate(
+    { _id: id, status: 'open' },
+    { $set: { status: 'resolved', resolution, decision } },
+    { new: true }
+  );
+  if (!dispute) {
+    const exists = await Dispute.exists({ _id: id });
+    if (!exists) throw new AppError('Không tìm thấy khiếu nại', 404);
+    throw new AppError('Khiếu nại này đã được xử lý', 409);
+  }
+
+  const tx = await Transaction.findById(dispute.transactionId);
+  if (tx) {
+    // Quyết định của admin tác động trực tiếp lên trạng thái giao dịch —
+    // hoàn tiền/giải ngân đóng luôn escrow, từ chối thì giữ nguyên trạng thái hiện tại.
+    if (decision === 'refund') {
+      tx.escrowStep = 'refunded';
+      await tx.save();
+    } else if (decision === 'release') {
+      tx.escrowStep = 'released';
+      await tx.save();
+    }
+
+    const notifyBody = decision === 'refund'
+      ? `Khiếu nại về "${tx.listingTitle}" đã được xử lý: hoàn tiền cho người mua.`
+      : decision === 'release'
+        ? `Khiếu nại về "${tx.listingTitle}" đã được xử lý: giải ngân cho người bán.`
+        : `Khiếu nại về "${tx.listingTitle}" đã được xử lý: ${resolution}`;
+
+    for (const userId of [tx.buyerId.toString(), tx.sellerId.toString()]) {
+      await notificationService.create({
+        userId,
+        type: 'dispute',
+        title: 'Khiếu nại đã được giải quyết',
+        body: notifyBody,
+        relatedId: dispute._id.toString(),
+      }).catch((err) => console.error('Dispute resolve notification failed:', err));
+    }
+  }
+
   return dispute;
 };
 

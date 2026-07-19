@@ -26,6 +26,11 @@ export const updateProfileSchema = z.object({
     .min(5, "Địa chỉ không hợp lệ")
     .max(200, "Địa chỉ không được vượt quá 200 ký tự")
     .optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  bankName: z.string().trim().max(100).optional(),
+  bankAccountNumber: z.string().trim().max(30).optional(),
+  bankAccountHolder: z.string().trim().max(100).optional(),
 });
 
 export const updateUserSettingsSchema = z

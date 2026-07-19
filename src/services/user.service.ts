@@ -5,6 +5,12 @@ import { AppError } from "../utils/AppError";
 type UpdateProfilePayload = {
   fullName?: string;
   phone?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
 };
 
 type UpdateUserSettingsPayload = {

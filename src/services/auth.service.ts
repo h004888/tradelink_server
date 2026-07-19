@@ -38,8 +38,7 @@ export const register = async (
       phone,
       address,
       passwordHash,
-      // TODO: Review whether forcing every self-registered account to `buyer` is still correct for the product flow.
-      role: 'buyer',
+      role: 'user',
       isVerified: false,
       otp,
       otpExpiry,
@@ -119,8 +118,7 @@ export const loginWithGoogle = async (
       fullName,
       avatarUrl: payload.picture,
       isVerified: payload.email_verified ?? true,
-      // TODO: Review whether forcing every self-registered account to `buyer` is still correct for the product flow.
-      role: 'buyer',
+      role: 'user',
     });
   } else {
     const updatePayload: Record<string, unknown> = {};

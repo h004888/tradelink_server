@@ -1,4 +1,4 @@
-import { Notification } from '../models/notification.model';
+import { Notification, NotificationType } from '../models/notification.model';
 import { AppError } from '../utils/AppError';
 
 export const getAll = async (userId: string) => {
@@ -15,6 +15,6 @@ export const markAllRead = async (userId: string) => {
   await Notification.updateMany({ userId, isRead: false }, { $set: { isRead: true } });
 };
 
-export const create = async (data: { userId: string; type: 'transaction' | 'chat' | 'dispute' | 'system'; title: string; body: string; relatedId?: string }) => {
+export const create = async (data: { userId: string; type: NotificationType; title: string; body: string; relatedId?: string }) => {
   return Notification.create(data);
 };
