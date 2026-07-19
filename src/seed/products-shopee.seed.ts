@@ -172,7 +172,7 @@ async function seedProducts() {
   if (!seller) {
     seller = await User.create({
       email: 'demo-seller@tradelink.dev',
-      name: 'Demo Seller',
+      fullName: 'Demo Seller',
       role: 'seller',
       isVerified: true,
       reputationScore: 85,
@@ -218,7 +218,7 @@ async function seedProducts() {
       type: 'sale',
       status: 'active',
       sellerId: seller._id,
-      sellerName: seller.name,
+      sellerName: seller.fullName,
       views: Math.floor(Math.random() * 200),
       interests: Math.floor(Math.random() * 20),
       saves: Math.floor(Math.random() * 30),

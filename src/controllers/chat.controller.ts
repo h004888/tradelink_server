@@ -68,8 +68,8 @@ export const sendMessage = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Lấy tên user từ DB để hiển thị trong message (JWT chỉ có id/email/role)
-    const sender = await User.findById(userId).select('name');
-    const senderName = sender?.name ?? 'Unknown';
+    const sender = await User.findById(userId).select('fullName');
+    const senderName = sender?.fullName ?? 'Unknown';
 
     const msg = await chatService.sendMessage(conversationId, userId, senderName, text, isOffer, offerListingId, imageUrl);
     // E5/K1 — broadcast realtime (nếu gateway đã được attach)
