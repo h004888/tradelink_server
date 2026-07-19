@@ -4,7 +4,7 @@ export interface IUser extends Document {
   email: string;
   name: string;
   passwordHash?: string;
-  role: 'buyer' | 'seller' | 'admin';
+  role: 'user' | 'admin';
   avatarUrl?: string;
   phone?: string;
   address?: string;
@@ -34,6 +34,10 @@ export interface IUser extends Document {
   otpLockedUntil?: Date;
   // Auth — refresh token rotation version
   tokenVersion: number;
+  // Thông tin nhận tiền — admin dùng để chuyển khoản thủ công khi giao dịch bán hàng hoàn tất.
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
 }
 
 const userSchema = new Schema<IUser>(
@@ -41,7 +45,7 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true },
     passwordHash: { type: String },
-    role: { type: String, enum: ['buyer', 'seller', 'admin'], default: 'buyer' },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
     avatarUrl: { type: String },
     phone: { type: String },
     address: { type: String },
@@ -65,6 +69,9 @@ const userSchema = new Schema<IUser>(
     otpAttempts: { type: Number, default: 0, select: false },
     otpLockedUntil: { type: Date, select: false },
     tokenVersion: { type: Number, default: 0 },
+    bankName: { type: String },
+    bankAccountNumber: { type: String },
+    bankAccountHolder: { type: String },
   },
   { timestamps: true }
 );

@@ -37,3 +37,10 @@ export const confirmTrade = async (req: AuthRequest, res: Response, next: NextFu
     res.json({ success: true, data: tx });
   } catch (err) { next(err); }
 };
+
+export const getPaymentInfo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const info = await transactionService.getPaymentInfo(req.params.id as string, req.user!.id);
+    res.json({ success: true, data: info });
+  } catch (err) { next(err); }
+};

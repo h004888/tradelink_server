@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   getTransactions, getTransaction, createTransaction,
-  advanceEscrow, confirmTrade,
+  advanceEscrow, confirmTrade, getPaymentInfo,
 } from '../controllers/transaction.controller';
 import { authenticate } from '../middlewares/auth';
 
@@ -14,5 +14,6 @@ router.get('/:id', getTransaction);
 router.post('/', createTransaction);
 router.post('/:id/advance-escrow', advanceEscrow);
 router.post('/:id/confirm', confirmTrade);
+router.get('/:id/payment-info', getPaymentInfo);
 
 export default router;

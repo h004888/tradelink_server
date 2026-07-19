@@ -15,7 +15,8 @@
     "seed:products": "ts-node src/seed/products-shopee.seed.ts",
     "seed:dummyjson": "ts-node src/seed/products-dummyjson.seed.ts",
     "seed:link": "ts-node src/seed/link-categories.seed.ts",
-    "seed:all": "ts-node src/seed/products-dummyjson.seed.ts && ts-node src/seed/link-categories.seed.ts"
+    "seed:all": "ts-node src/seed/products-dummyjson.seed.ts && ts-node src/seed/link-categories.seed.ts",
+    "migrate:roles": "ts-node src/seed/migrate-roles.ts"
   },
   "keywords": [],
   "author": "",

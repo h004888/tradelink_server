@@ -20,4 +20,17 @@ export const config = {
     rounds: parseInt(process.env.BCRYPT_ROUNDS || '10', 10),
   },
   autoVerifyEmail: process.env.AUTO_VERIFY_EMAIL !== 'false',
+  sepay: {
+    webhookApiKey: process.env.SEPAY_WEBHOOK_API_KEY || '',
+    bankBin: process.env.SEPAY_BANK_BIN || '',
+    accountNumber: process.env.SEPAY_ACCOUNT_NUMBER || '',
+    accountName: process.env.SEPAY_ACCOUNT_NAME || '',
+    // Nếu tài khoản ngân hàng chỉ hỗ trợ VA (Virtual Account), QR phải trỏ vào số VA này
+    // thay vì số tài khoản chính — tiền chuyển vào tài khoản chính sẽ KHÔNG được SePay ghi nhận.
+    vaNumber: process.env.SEPAY_VA_NUMBER || '',
+    // Public API token (my.sepay.vn → Tạo API Token) — dùng để chủ động poll danh sách giao dịch,
+    // làm phương án dự phòng cho trường hợp webhook không được gọi (một số tài khoản VA gặp tình
+    // trạng này dù SePay vẫn ghi nhận giao dịch phía họ).
+    apiKey: process.env.SEPAY_API_KEY || '',
+  },
 };

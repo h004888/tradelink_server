@@ -35,7 +35,7 @@ export const register = async (
       phone,
       address,
       passwordHash,
-      role: 'buyer',
+      role: 'user',
       isVerified: false,
       otp,
       otpExpiry,
