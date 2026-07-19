@@ -1,6 +1,8 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { User } from '../models/user.model';
+import { Conversation } from '../models/conversation.model';
 import * as chatService from '../services/chat.service';
 
 /**
@@ -17,13 +19,19 @@ export class ChatGateway {
       cors: { origin: '*', methods: ['GET', 'POST'] },
     });
 
-    // Auth middleware
-    this.io.use((socket, next) => {
+    // Auth middleware — verify JWT + check tokenVersion để vô hiệu hóa token cũ
+    this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth?.token || socket.handshake.query?.token;
         if (!token) return next(new Error('NO_TOKEN'));
-        const payload = jwt.verify(String(token), config.jwt.secret) as { id: string; email: string };
-        (socket as any).user = payload;
+        const payload = jwt.verify(String(token), config.jwt.secret) as { id: string; email: string; tokenVersion?: number };
+        // Verify tokenVersion — nếu user đã đổi mật khẩu, token cũ bị từ chối
+        const user = await User.findById(payload.id).select('tokenVersion');
+        if (!user) return next(new Error('INVALID_TOKEN'));
+        if (payload.tokenVersion !== undefined && user.tokenVersion !== payload.tokenVersion) {
+          return next(new Error('TOKEN_REVOKED'));
+        }
+        (socket as any).user = { ...payload, tokenVersion: user.tokenVersion };
         next();
       } catch (err) {
         next(new Error('INVALID_TOKEN'));
@@ -45,13 +53,26 @@ export class ChatGateway {
     });
 
     // Client có thể emit `send` để gửi realtime (forward tới service + broadcast)
-    socket.on('send', async (payload: { conversationId: string; text: string; isOffer?: boolean; offerListingId?: string }, ack?: (res: any) => void) => {
+    socket.on('send', async (payload: { conversationId: string; text: string; isOffer?: boolean; offerListingId?: string; imageUrl?: string }, ack?: (res: any) => void) => {
       try {
-        if (!payload?.conversationId || !payload.text) {
-          ack?.({ success: false, message: 'Thiếu conversationId hoặc text' });
+        if (!payload?.conversationId || (!payload.text && !payload.imageUrl)) {
+          ack?.({ success: false, message: 'Thiếu conversationId hoặc nội dung tin nhắn' });
           return;
         }
-        const name = (user as any).name || user.email.split('@')[0];
+        // Membership check: socket user phải là participant của conversation
+        const conv = await Conversation.findById(payload.conversationId);
+        if (!conv) {
+          ack?.({ success: false, message: 'Không tìm thấy hội thoại' });
+          return;
+        }
+        const isParticipant = conv.participants.some((p) => p.toString() === user.id);
+        if (!isParticipant) {
+          ack?.({ success: false, message: 'Bạn không có quyền gửi tin nhắn vào hội thoại này' });
+          return;
+        }
+        // Lấy tên user từ DB để hiển thị chính xác
+        const senderDoc = await User.findById(user.id).select('name');
+        const name = senderDoc?.name || user.email.split('@')[0];
         const msg = await chatService.sendMessage(
           payload.conversationId,
           user.id,
@@ -59,6 +80,7 @@ export class ChatGateway {
           payload.text,
           !!payload.isOffer,
           payload.offerListingId,
+          payload.imageUrl,
         );
         const out = {
           _id: String(msg._id),
@@ -66,6 +88,7 @@ export class ChatGateway {
           senderId: String(msg.senderId),
           senderName: msg.senderName,
           text: msg.text,
+          imageUrl: msg.imageUrl ?? null,
           isOffer: msg.isOffer,
           offerListingId: msg.offerListingId ? String(msg.offerListingId) : null,
           createdAt: msg.createdAt,
@@ -78,6 +101,22 @@ export class ChatGateway {
       }
     });
 
+    // Client emit `read` khi mở/scroll tới cuối conversation → đánh dấu đã đọc + báo cho người gửi
+    socket.on('read', async (payload: { conversationId: string }) => {
+      try {
+        if (!payload?.conversationId) return;
+        const messageIds = await chatService.markAsRead(payload.conversationId, user.id);
+        if (messageIds.length === 0) return;
+        this.io?.to(`conv:${payload.conversationId}`).emit('message:read', {
+          conversationId: payload.conversationId,
+          readerId: user.id,
+          messageIds,
+        });
+      } catch {
+        // best-effort — không cần ack
+      }
+    });
+
     socket.on('disconnect', () => {
       // cleanup rooms auto khi disconnect — không cần xử lý thêm
     });
@@ -87,6 +126,12 @@ export class ChatGateway {
   broadcastMessage(conversationId: string, msg: any): void {
     if (!this.io) return;
     this.io.to(`conv:${conversationId}`).emit('message:new', msg);
+  }
+
+  /** Được gọi từ REST controller khi có tin nhắn được đánh dấu đã đọc qua HTTP. */
+  broadcastRead(conversationId: string, readerId: string, messageIds: string[]): void {
+    if (!this.io || messageIds.length === 0) return;
+    this.io.to(`conv:${conversationId}`).emit('message:read', { conversationId, readerId, messageIds });
   }
 }
 

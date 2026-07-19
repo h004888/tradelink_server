@@ -25,9 +25,10 @@ export const getMessages = async (conversationId: string, page = 1, limit = 50) 
   return messages.reverse();
 };
 
-export const sendMessage = async (conversationId: string, senderId: string, senderName: string, text: string, isOffer = false, offerListingId?: string): Promise<IMessage> => {
-  const msg = await Message.create({ conversationId, senderId, senderName, text, isOffer, offerListingId });
-  await Conversation.findByIdAndUpdate(conversationId, { lastMessage: text.slice(0, 100), updatedAt: new Date() });
+export const sendMessage = async (conversationId: string, senderId: string, senderName: string, text: string, isOffer = false, offerListingId?: string, imageUrl?: string): Promise<IMessage> => {
+  const msg = await Message.create({ conversationId, senderId, senderName, text, isOffer, offerListingId, imageUrl, readBy: [senderId] });
+  const preview = text ? text.slice(0, 100) : (imageUrl ? '[Hình ảnh]' : '');
+  await Conversation.findByIdAndUpdate(conversationId, { lastMessage: preview, updatedAt: new Date() });
 
   // F1: Notify cho participants khác (trừ người gửi)
   const conv = await Conversation.findById(conversationId);
@@ -45,4 +46,21 @@ export const sendMessage = async (conversationId: string, senderId: string, send
   }
 
   return msg;
+};
+
+/**
+ * Đánh dấu đã đọc tất cả tin nhắn (của người khác) trong 1 conversation.
+ * Trả về danh sách message id vừa được đánh dấu — dùng để broadcast 'message:read'.
+ */
+export const markAsRead = async (conversationId: string, userId: string): Promise<string[]> => {
+  const unread = await Message.find({
+    conversationId,
+    senderId: { $ne: userId },
+    readBy: { $ne: userId },
+  }).select('_id');
+  if (unread.length === 0) return [];
+
+  const ids = unread.map((m) => m._id);
+  await Message.updateMany({ _id: { $in: ids } }, { $addToSet: { readBy: userId } });
+  return ids.map((id) => String(id));
 };

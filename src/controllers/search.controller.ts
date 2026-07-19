@@ -10,6 +10,7 @@ export const search = async (req: Request, res: Response, next: NextFunction) =>
       categoryId: req.query.categoryId as string,
       minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
       maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
+      sort: req.query.sort as string,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
