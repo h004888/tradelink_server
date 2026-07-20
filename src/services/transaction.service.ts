@@ -4,6 +4,7 @@ import { Listing } from '../models/listing.model';
 import { AppError } from '../utils/AppError';
 import { config } from '../config';
 import * as notificationService from './notification.service';
+import * as walletService from './wallet.service';
 
 const ESCROW_FLOW: EscrowStep[] = ['paymentPending', 'paymentConfirmed', 'shipping', 'delivered', 'reviewPeriod', 'released'];
 
@@ -111,7 +112,14 @@ export const advanceEscrow = async (id: string, userId: string): Promise<ITransa
   // sau khi người mua xác nhận hoàn tất (không có cơ chế đếm giờ review thực sự).
   if (nextStep === 'reviewPeriod') {
     tx.escrowStep = 'released';
-    tx.payoutStatus = 'pending';
+    await tx.save();
+  }
+
+  // Cộng tiền vào ví seller ngay khi escrow hoàn tất (released) — seller tự chủ động
+  // rút tiền về ngân hàng qua Ví, thay vì admin chủ động chuyển khoản theo từng đơn.
+  if (tx.escrowStep === 'released') {
+    await walletService.creditForSale(tx);
+    tx.walletCredited = true;
     await tx.save();
   }
 

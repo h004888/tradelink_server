@@ -24,17 +24,32 @@ export const getTransactions = async (_req: AuthRequest, res: Response, next: Ne
   } catch (err) { next(err); }
 };
 
-export const getPendingPayouts = async (_req: AuthRequest, res: Response, next: NextFunction) => {
+export const getWalletOverview = async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const payouts = await adminService.getPendingPayouts();
-    res.json({ success: true, data: payouts });
+    const overview = await adminService.getWalletOverview();
+    res.json({ success: true, data: overview });
   } catch (err) { next(err); }
 };
 
-export const markPayoutPaid = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const getWithdrawals = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const tx = await adminService.markPayoutPaid(req.params.id as string);
-    res.json({ success: true, data: tx });
+    const status = req.query.status as 'pending' | 'paid' | 'rejected' | undefined;
+    const withdrawals = await adminService.getWithdrawals(status);
+    res.json({ success: true, data: withdrawals });
+  } catch (err) { next(err); }
+};
+
+export const approveWithdrawal = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const withdrawal = await adminService.approveWithdrawal(req.params.id as string, req.user!.id);
+    res.json({ success: true, data: withdrawal });
+  } catch (err) { next(err); }
+};
+
+export const rejectWithdrawal = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const withdrawal = await adminService.rejectWithdrawal(req.params.id as string, req.user!.id, req.body?.note);
+    res.json({ success: true, data: withdrawal });
   } catch (err) { next(err); }
 };
 

@@ -19,9 +19,8 @@ export interface ITransaction extends Document {
   // SePay — mã đối soát gắn trong nội dung chuyển khoản để webhook khớp đúng giao dịch.
   paymentCode?: string;
   sepayReferenceCode?: string;
-  // Giải ngân thủ công cho seller — set 'pending' khi escrowStep chuyển sang 'released'.
-  payoutStatus?: 'pending' | 'paid';
-  payoutAt?: Date;
+  // Cờ idempotent — đánh dấu đã cộng tiền vào ví seller khi escrowStep chuyển sang 'released'.
+  walletCredited?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,8 +45,7 @@ const transactionSchema = new Schema<ITransaction>(
     partyBReceived: { type: Boolean },
     paymentCode: { type: String },
     sepayReferenceCode: { type: String },
-    payoutStatus: { type: String, enum: ['pending', 'paid'] },
-    payoutAt: { type: Date },
+    walletCredited: { type: Boolean },
   },
   { timestamps: true }
 );
