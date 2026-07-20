@@ -3,6 +3,9 @@ import { User, IUser } from '../models/user.model';
 import { Transaction } from '../models/transaction.model';
 import { Listing, IListing } from '../models/listing.model';
 import { Dispute } from '../models/dispute.model';
+import { Wallet } from '../models/wallet.model';
+import { WalletLedgerEntry } from '../models/walletLedger.model';
+import { WithdrawalRequest, WithdrawalStatus } from '../models/withdrawalRequest.model';
 import { config } from '../config';
 import { AppError } from '../utils/AppError';
 import * as notificationService from './notification.service';
@@ -43,29 +46,95 @@ export const getAllTransactions = async () => {
 };
 
 /**
- * Giao dịch bán hàng đã 'released' (buyer xác nhận hoàn tất) nhưng admin chưa chuyển
- * khoản thủ công cho seller — dùng cho màn "Cần thanh toán" trong admin app.
+ * Tổng quan ví trên toàn hệ thống — dùng cho màn "Ví" trong admin app: tổng số dư
+ * (tiền admin đang giữ hộ seller), tổng đang chờ rút, tổng đã rút thành công.
  */
-export const getPendingPayouts = async () => {
-  return Transaction.find({ type: 'sale', escrowStep: 'released', payoutStatus: 'pending' })
-    .sort({ updatedAt: 1 })
-    .populate('sellerId', 'fullName phone bankName bankAccountNumber bankAccountHolder')
-    .populate('buyerId', 'fullName phone');
+export const getWalletOverview = async () => {
+  const [balanceAgg, pendingAgg, paidAgg] = await Promise.all([
+    Wallet.aggregate([{ $group: { _id: null, total: { $sum: '$balance' } } }]),
+    WithdrawalRequest.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    WithdrawalRequest.aggregate([{ $match: { status: 'paid' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+  ]);
+  return {
+    totalBalance: balanceAgg[0]?.total || 0,
+    totalPending: pendingAgg[0]?.total || 0,
+    totalPaidOut: paidAgg[0]?.total || 0,
+  };
 };
 
 /**
- * Admin xác nhận đã tự chuyển khoản tiền hàng cho seller (thao tác thủ công, không tự
- * động chuyển tiền thật). Atomic filter theo payoutStatus:'pending' để tránh double-payout
- * nếu admin bấm 2 lần / 2 tab.
+ * Danh sách yêu cầu rút tiền — dùng cho màn "Yêu cầu rút tiền" trong admin app.
+ * Không phân trang (khối lượng nhỏ), sắp xếp cũ nhất trước cho hàng đợi 'pending'.
  */
-export const markPayoutPaid = async (id: string) => {
-  const tx = await Transaction.findOneAndUpdate(
-    { _id: id, payoutStatus: 'pending' },
-    { $set: { payoutStatus: 'paid', payoutAt: new Date() } },
+export const getWithdrawals = async (status?: WithdrawalStatus) => {
+  const query = status ? { status } : {};
+  return WithdrawalRequest.find(query)
+    .sort({ createdAt: status === 'pending' ? 1 : -1 })
+    .populate('userId', 'fullName phone bankName bankAccountNumber bankAccountHolder');
+};
+
+/**
+ * Admin xác nhận đã tự chuyển khoản cho seller (thao tác thủ công, không tự động
+ * chuyển tiền thật). Atomic filter theo status:'pending' để tránh double-processing.
+ */
+export const approveWithdrawal = async (id: string, adminUserId: string) => {
+  const withdrawal = await WithdrawalRequest.findOneAndUpdate(
+    { _id: id, status: 'pending' },
+    { $set: { status: 'paid', processedAt: new Date(), processedBy: adminUserId } },
     { new: true }
   );
-  if (!tx) throw new AppError('Không tìm thấy giao dịch cần thanh toán hoặc đã được xử lý trước đó', 404);
-  return tx;
+  if (!withdrawal) throw new AppError('Không tìm thấy yêu cầu rút tiền hoặc đã được xử lý trước đó', 404);
+
+  await Wallet.findOneAndUpdate({ userId: withdrawal.userId }, { $inc: { totalWithdrawn: withdrawal.amount } });
+
+  await notificationService.create({
+    userId: withdrawal.userId.toString(),
+    type: 'wallet',
+    title: 'Yêu cầu rút tiền đã được xử lý',
+    body: `Yêu cầu rút ${withdrawal.amount.toLocaleString('vi-VN')}đ đã được admin chuyển khoản.`,
+    relatedId: withdrawal._id.toString(),
+  }).catch((err) => console.error('Withdrawal notification failed:', err));
+
+  return withdrawal;
+};
+
+/**
+ * Admin từ chối yêu cầu rút tiền — hoàn lại số dư vào ví seller.
+ */
+export const rejectWithdrawal = async (id: string, adminUserId: string, note?: string) => {
+  const withdrawal = await WithdrawalRequest.findOneAndUpdate(
+    { _id: id, status: 'pending' },
+    { $set: { status: 'rejected', processedAt: new Date(), processedBy: adminUserId, note } },
+    { new: true }
+  );
+  if (!withdrawal) throw new AppError('Không tìm thấy yêu cầu rút tiền hoặc đã được xử lý trước đó', 404);
+
+  const wallet = await Wallet.findOneAndUpdate(
+    { userId: withdrawal.userId },
+    { $inc: { balance: withdrawal.amount } },
+    { new: true }
+  );
+
+  await WalletLedgerEntry.create({
+    userId: withdrawal.userId,
+    type: 'credit',
+    reason: 'withdrawal_refund',
+    amount: withdrawal.amount,
+    balanceAfter: wallet?.balance || 0,
+    relatedWithdrawalId: withdrawal._id,
+  });
+
+  await notificationService.create({
+    userId: withdrawal.userId.toString(),
+    type: 'wallet',
+    title: 'Yêu cầu rút tiền bị từ chối',
+    body: note
+      ? `Yêu cầu rút ${withdrawal.amount.toLocaleString('vi-VN')}đ đã bị từ chối: ${note}. Số dư đã được hoàn lại vào ví.`
+      : `Yêu cầu rút ${withdrawal.amount.toLocaleString('vi-VN')}đ đã bị từ chối. Số dư đã được hoàn lại vào ví.`,
+    relatedId: withdrawal._id.toString(),
+  }).catch((err) => console.error('Withdrawal notification failed:', err));
+
+  return withdrawal;
 };
 
 export const getFlaggedListings = async () => {
