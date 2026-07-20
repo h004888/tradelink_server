@@ -20,6 +20,20 @@ const ADVANCE_ACTOR: Partial<Record<EscrowStep, 'buyer' | 'seller'>> = {
   delivered: 'buyer',         // Người mua xác nhận hoàn tất, giải ngân
 };
 
+const notifyTransaction = async (tx: ITransaction, userId: string, title: string, body: string, action: string) => {
+  await notificationService.create({
+    userId,
+    type: 'transaction',
+    title,
+    body,
+    entityType: 'transaction',
+    entityId: tx._id.toString(),
+    action,
+    deeplink: `/transactions/${tx._id.toString()}`,
+    relatedId: tx._id.toString(),
+  } as any).catch((err) => console.error('Transaction notification failed:', err));
+};
+
 /** Mã đối soát gắn vào nội dung chuyển khoản để webhook SePay khớp đúng giao dịch. */
 export const generatePaymentCode = (): string => {
   const rand = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 ký tự hex
@@ -69,8 +83,12 @@ export const create = async (data: { listingId: string; buyerId: string; buyerNa
     type: 'transaction',
     title: 'Đơn hàng mới',
     body: `Bạn có đơn hàng mới cho "${listing.title}"`,
+    entityType: 'transaction',
+    entityId: tx._id.toString(),
+    action: 'transaction.created',
+    deeplink: `/transactions/${tx._id.toString()}`,
     relatedId: tx._id.toString(),
-  }).catch((err) => {
+  } as any).catch((err) => {
     // Notification failure không nên block transaction
     console.error('Notification failed:', err);
   });
@@ -123,6 +141,15 @@ export const advanceEscrow = async (id: string, userId: string): Promise<ITransa
     await tx.save();
   }
 
+  if (nextStep === 'shipping') {
+    await notifyTransaction(tx, tx.buyerId.toString(), 'Người bán đã gửi hàng', `Giao dịch "${tx.listingTitle}" cần người mua xác nhận nhận hàng.`, 'transaction.shippingRequired');
+  } else if (nextStep === 'delivered') {
+    await notifyTransaction(tx, tx.sellerId.toString(), 'Người mua đã nhận hàng', `Giao dịch "${tx.listingTitle}" đã được người mua xác nhận nhận hàng.`, 'transaction.deliveryConfirmed');
+  }
+  if (tx.escrowStep === 'released') {
+    await notifyTransaction(tx, tx.sellerId.toString(), 'Giao dịch đã hoàn tất', `Giao dịch "${tx.listingTitle}" đã được giải ngân.`, 'transaction.released');
+  }
+
   return tx;
 };
 
@@ -157,6 +184,12 @@ export const confirmTrade = async (id: string, userId: string, party: 'A' | 'B',
   }
 
   await tx.save();
+  const otherUserId = isBuyer ? tx.sellerId.toString() : tx.buyerId.toString();
+  await notifyTransaction(tx, otherUserId, 'Giao dịch trao đổi được cập nhật', `Giao dịch "${tx.listingTitle}" vừa được cập nhật.`, 'transaction.tradeUpdated');
+  if (tx.partyAReceived === true && tx.partyBReceived === true) {
+    await notifyTransaction(tx, tx.buyerId.toString(), 'Giao dịch trao đổi hoàn tất', `Giao dịch "${tx.listingTitle}" đã hoàn tất.`, 'transaction.tradeCompleted');
+    await notifyTransaction(tx, tx.sellerId.toString(), 'Giao dịch trao đổi hoàn tất', `Giao dịch "${tx.listingTitle}" đã hoàn tất.`, 'transaction.tradeCompleted');
+  }
   return tx;
 };
 
@@ -233,8 +266,12 @@ export const confirmPaymentFromWebhook = async (
       type: 'transaction',
       title,
       body: `Giao dịch "${tx.listingTitle}" đã được xác nhận thanh toán qua SePay.`,
+      entityType: 'transaction',
+      entityId: tx._id.toString(),
+      action: 'transaction.paymentConfirmed',
+      deeplink: `/transactions/${tx._id.toString()}`,
       relatedId: tx._id.toString(),
-    }).catch((err) => console.error('SePay notification failed:', err));
+    } as any).catch((err) => console.error('SePay notification failed:', err));
   }
 
   return tx;

@@ -26,8 +26,9 @@ export const getMessages = async (conversationId: string, page = 1, limit = 50) 
 };
 
 export const sendMessage = async (conversationId: string, senderId: string, senderName: string, text: string, isOffer = false, offerListingId?: string, imageUrl?: string): Promise<IMessage> => {
-  const msg = await Message.create({ conversationId, senderId, senderName, text, isOffer, offerListingId, imageUrl, readBy: [senderId] });
-  const preview = text ? text.slice(0, 100) : (imageUrl ? '[Hình ảnh]' : '');
+  const messageText = text ?? '';
+  const msg = await Message.create({ conversationId, senderId, senderName, text: messageText, isOffer, offerListingId, imageUrl, readBy: [senderId] });
+  const preview = messageText ? messageText.slice(0, 100) : (imageUrl ? '[Hình ảnh]' : '');
   await Conversation.findByIdAndUpdate(conversationId, { lastMessage: preview, updatedAt: new Date() });
 
   // F1: Notify cho participants khác (trừ người gửi)
@@ -39,9 +40,13 @@ export const sendMessage = async (conversationId: string, senderId: string, send
         userId: recipientId.toString(),
         type: 'chat',
         title: `Tin nhắn mới từ ${senderName}`,
-        body: text.slice(0, 100),
+        body: preview,
+        entityType: 'conversation',
+        entityId: conversationId,
+        action: 'chat.message.created',
+        deeplink: `/chat/${conversationId}`,
         relatedId: conversationId,
-      }).catch((err) => console.error('Chat notification failed:', err));
+      } as any).catch((err) => console.error('Chat notification failed:', err));
     }
   }
 

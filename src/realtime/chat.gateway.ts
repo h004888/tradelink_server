@@ -45,6 +45,8 @@ export class ChatGateway {
     const user = (socket as any).user as { id: string; email: string } | undefined;
     if (!user) return;
 
+    socket.join(`user:${user.id}`);
+
     // Auto-join rooms cho tất cả conversations của user
     socket.on('join', (conversationId: string) => {
       if (typeof conversationId !== 'string') return;
@@ -132,6 +134,11 @@ export class ChatGateway {
   broadcastRead(conversationId: string, readerId: string, messageIds: string[]): void {
     if (!this.io || messageIds.length === 0) return;
     this.io.to(`conv:${conversationId}`).emit('message:read', { conversationId, readerId, messageIds });
+  }
+
+  broadcastNotification(userId: string, notification: any): void {
+    if (!this.io) return;
+    this.io.to(`user:${userId}`).emit('notification:new', notification);
   }
 }
 

@@ -8,6 +8,10 @@ export interface INotification extends Document {
   title: string;
   body: string;
   isRead: boolean;
+  entityType?: string;
+  entityId?: string;
+  action?: string;
+  deeplink?: string;
   relatedId?: string;
   createdAt: Date;
 }
@@ -19,6 +23,10 @@ const notificationSchema = new Schema<INotification>(
     title: { type: String, required: true },
     body: { type: String, required: true },
     isRead: { type: Boolean, default: false },
+    entityType: { type: String },
+    entityId: { type: String },
+    action: { type: String },
+    deeplink: { type: String },
     relatedId: { type: String },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

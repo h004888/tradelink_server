@@ -7,7 +7,22 @@ import * as notificationService from './notification.service';
 import { generatePaymentCode } from './transaction.service';
 
 export const create = async (data: Partial<IOffer>): Promise<IOffer> => {
-  return Offer.create(data);
+  const offer = await Offer.create(data);
+  const listing = await Listing.findById(offer.listingId);
+  if (listing) {
+    await notificationService.create({
+      userId: listing.sellerId.toString(),
+      type: 'offer',
+      title: 'Đề nghị mới',
+      body: `Bạn có đề nghị mới cho "${listing.title}"`,
+      entityType: 'offer',
+      entityId: offer._id.toString(),
+      action: 'offer.created',
+      deeplink: '/offers',
+      relatedId: offer._id.toString(),
+    } as any).catch((err) => console.error('Offer notification failed:', err));
+  }
+  return offer;
 };
 
 /**
@@ -40,8 +55,12 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
       type: 'offer',
       title: 'Đề nghị bị từ chối',
       body: `Người bán đã từ chối đề nghị của bạn cho "${listing.title}"`,
+      entityType: 'offer',
+      entityId: offer._id.toString(),
+      action: 'offer.rejected',
+      deeplink: '/offers',
       relatedId: offer._id.toString(),
-    }).catch((err) => console.error('Offer notification failed:', err));
+    } as any).catch((err) => console.error('Offer notification failed:', err));
     return { offer: rejected, transaction: null };
   }
 
@@ -97,8 +116,12 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
       type: 'offer',
       title: 'Đề nghị được chấp nhận!',
       body: `Người bán đã chấp nhận đề nghị của bạn cho "${listing.title}"`,
+      entityType: 'transaction',
+      entityId: tx._id.toString(),
+      action: 'offer.accepted',
+      deeplink: `/transactions/${tx._id.toString()}`,
       relatedId: tx._id.toString(),
-    }).catch((err) => console.error('Offer notification failed:', err));
+    } as any).catch((err) => console.error('Offer notification failed:', err));
 
     return { offer: claimed, transaction: tx };
   } catch (err) {
