@@ -18,7 +18,7 @@ export const create = async (data: Partial<IOffer>): Promise<IOffer> => {
       entityType: 'offer',
       entityId: offer._id.toString(),
       action: 'offer.created',
-      deeplink: '/offers',
+      deeplink: '/offers/list',
       relatedId: offer._id.toString(),
     } as any).catch((err) => console.error('Offer notification failed:', err));
   }
@@ -58,7 +58,7 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
       entityType: 'offer',
       entityId: offer._id.toString(),
       action: 'offer.rejected',
-      deeplink: '/offers',
+      deeplink: '/offers/list',
       relatedId: offer._id.toString(),
     } as any).catch((err) => console.error('Offer notification failed:', err));
     return { offer: rejected, transaction: null };
@@ -119,7 +119,7 @@ export const respond = async (offerId: string, actingUserId: string, accept: boo
       entityType: 'transaction',
       entityId: tx._id.toString(),
       action: 'offer.accepted',
-      deeplink: `/transactions/${tx._id.toString()}`,
+      deeplink: `/transactions/${transactionType === 'trade' ? 'trade' : 'sale'}/${tx._id.toString()}`,
       relatedId: tx._id.toString(),
     } as any).catch((err) => console.error('Offer notification failed:', err));
 

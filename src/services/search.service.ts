@@ -1,5 +1,9 @@
 import { Listing } from '../models/listing.model';
 import { Category } from '../models/category.model';
+import { SearchLog } from '../models/searchLog.model';
+
+/** Escape ký tự đặc biệt regex — query người dùng gõ dở (VD "iPhone (") không được để lọt thẳng vào new RegExp(). */
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export const search = async (params: {
   q?: string;
@@ -14,7 +18,14 @@ export const search = async (params: {
 }) => {
   const query: any = { status: 'active' };
 
-  if (params.q) query.$text = { $search: params.q };
+  if (params.q) {
+    const q = params.q.trim();
+    if (q) {
+      // Chỉ khớp theo title (không còn tìm cả description như trước).
+      query.title = { $regex: escapeRegex(q), $options: 'i' };
+      logSearchQuery(q).catch(() => {}); // fire-and-forget, không chặn response
+    }
+  }
   if (params.type) query.type = { $in: [params.type, 'both'] };
   if (params.category) query.category = params.category;
   if (params.categoryId) query.categoryId = params.categoryId;
@@ -136,10 +147,30 @@ export const getFeed = async (
   };
 };
 
+/** Ghi nhận một lượt tìm kiếm để phục vụ thống kê "phổ biến". */
+export const logSearchQuery = async (rawQuery: string): Promise<void> => {
+  const trimmed = rawQuery.trim();
+  if (trimmed.length < 2 || trimmed.length > 100) return;
+  const key = trimmed.toLowerCase();
+
+  await SearchLog.updateOne(
+    { query: key },
+    { $inc: { count: 1 }, $set: { lastSearchedAt: new Date(), label: trimmed } },
+    { upsert: true }
+  );
+};
+
+/** Top từ khóa được tìm nhiều nhất, dựa trên dữ liệu thật thay vì hardcode. */
+export const getPopularSearches = async (limit: number = 10): Promise<string[]> => {
+  const safeLimit = Math.min(Math.max(limit, 1), 20);
+  const logs = await SearchLog.find().sort({ count: -1, lastSearchedAt: -1 }).limit(safeLimit);
+  return logs.map((l) => l.label);
+};
+
 export const getSuggestions = async (query: string) => {
   if (!query || query.length < 2) return { categories: [], products: [] };
 
-  const regex = new RegExp(query, 'i');
+  const regex = new RegExp(escapeRegex(query), 'i');
 
   const [categories, products] = await Promise.all([
     Category.find({ name: regex, isActive: true }).limit(5),

@@ -69,7 +69,7 @@ describe('transaction.service notification contract', () => {
       entityType: 'transaction',
       entityId: 'tx1',
       action: 'transaction.created',
-      deeplink: '/transactions/tx1',
+      deeplink: '/transactions/sale/tx1',
       relatedId: 'tx1',
     }));
   });
@@ -90,14 +90,14 @@ describe('transaction.service notification contract', () => {
       entityType: 'transaction',
       entityId: 'tx1',
       action: 'transaction.paymentConfirmed',
-      deeplink: '/transactions/tx1',
+      deeplink: '/transactions/sale/tx1',
     }));
     expect(notificationService.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
       userId: 'seller1',
       entityType: 'transaction',
       entityId: 'tx1',
       action: 'transaction.paymentConfirmed',
-      deeplink: '/transactions/tx1',
+      deeplink: '/transactions/sale/tx1',
     }));
   });
 

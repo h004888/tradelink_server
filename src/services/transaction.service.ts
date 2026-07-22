@@ -29,7 +29,7 @@ const notifyTransaction = async (tx: ITransaction, userId: string, title: string
     entityType: 'transaction',
     entityId: tx._id.toString(),
     action,
-    deeplink: `/transactions/${tx._id.toString()}`,
+    deeplink: `/transactions/${tx.type === 'trade' ? 'trade' : 'sale'}/${tx._id.toString()}`,
     relatedId: tx._id.toString(),
   } as any).catch((err) => console.error('Transaction notification failed:', err));
 };
@@ -86,7 +86,7 @@ export const create = async (data: { listingId: string; buyerId: string; buyerNa
     entityType: 'transaction',
     entityId: tx._id.toString(),
     action: 'transaction.created',
-    deeplink: `/transactions/${tx._id.toString()}`,
+    deeplink: `/transactions/${tx.type === 'trade' ? 'trade' : 'sale'}/${tx._id.toString()}`,
     relatedId: tx._id.toString(),
   } as any).catch((err) => {
     // Notification failure không nên block transaction
@@ -269,7 +269,7 @@ export const confirmPaymentFromWebhook = async (
       entityType: 'transaction',
       entityId: tx._id.toString(),
       action: 'transaction.paymentConfirmed',
-      deeplink: `/transactions/${tx._id.toString()}`,
+      deeplink: `/transactions/${tx.type === 'trade' ? 'trade' : 'sale'}/${tx._id.toString()}`,
       relatedId: tx._id.toString(),
     } as any).catch((err) => console.error('SePay notification failed:', err));
   }
