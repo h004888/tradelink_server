@@ -3,6 +3,7 @@ import { Transaction } from '../models/transaction.model';
 import { User } from '../models/user.model';
 import { AppError } from '../utils/AppError';
 import * as notificationService from './notification.service';
+import * as walletService from './wallet.service';
 
 export const create = async (data: { transactionId: string; raisedBy: string; reason: string; description: string; priority?: boolean }) => {
   const exists = await Dispute.findOne({ transactionId: data.transactionId });
@@ -72,6 +73,10 @@ export const resolve = async (id: string, resolution: string, decision?: 'refund
       await tx.save();
     } else if (decision === 'release') {
       tx.escrowStep = 'released';
+      // Đồng bộ với advanceEscrow() thường (transaction.service.ts) — giải ngân qua
+      // khiếu nại cũng phải cộng tiền vào ví seller, không chỉ đổi trạng thái.
+      await walletService.creditForSale(tx);
+      tx.walletCredited = true;
       await tx.save();
     }
 
