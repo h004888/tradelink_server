@@ -58,7 +58,7 @@ describe('offer.service notification contract', () => {
       entityType: 'offer',
       entityId: 'offer1',
       action: 'offer.created',
-      deeplink: '/offers',
+      deeplink: '/offers/list',
       relatedId: 'offer1',
     }));
   });
@@ -76,7 +76,7 @@ describe('offer.service notification contract', () => {
       entityType: 'offer',
       entityId: 'offer1',
       action: 'offer.rejected',
-      deeplink: '/offers',
+      deeplink: '/offers/list',
       relatedId: 'offer1',
     }));
   });
@@ -111,7 +111,7 @@ describe('offer.service notification contract', () => {
       entityType: 'transaction',
       entityId: 'tx1',
       action: 'offer.accepted',
-      deeplink: '/transactions/tx1',
+      deeplink: '/transactions/sale/tx1',
       relatedId: 'tx1',
     }));
   });

@@ -68,6 +68,14 @@ export const suggestions = async (req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 };
 
+export const popularSearches = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const data = await searchService.getPopularSearches(limit);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 export const categories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await searchService.getCategories();
